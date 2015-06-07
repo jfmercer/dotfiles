@@ -1,0 +1,51 @@
+# git user & Github credentials are set as env variables. See README for more
+# info.
+
+[apply]
+	# Detect whitespace errors when applying a patch
+	whitespace = fix
+
+[color]
+    ui = true
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "diff"]
+    meta = yellow bold
+    frag = magenta bold
+    old = red bold
+    new = green bold
+
+[color "status"]
+    added = yellow
+    changed = green
+    untracked = red
+	  interactive = auto
+	  grep = auto
+
+[core]
+	excludesfile = ~/.gitignore
+	editor = vim
+
+[credential]
+	helper = osxkeychain
+
+[user]
+	name = John F. Mercer
+    # This forces me to choose either my personal email
+    # or my work email per repository
+    # Set with: git config user.email "foobar"
+	email = (none)
+[github]
+    user = jfmercer
+
+[push]
+    # 'git push' will push the current branch to its tracking branch
+    # the usual default is to push all branches
+    default = upstream
+
+[diff]
+	mnemonicprefix = true

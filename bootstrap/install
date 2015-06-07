@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# Run all dotfiles installers.
+# This must be run manually.
+# It is not called by any other script (for now)
+#
+# DO NOT RENAME TO INSTALL.SH:
+# That would create an infinite loop
+
+set -e
+
+cd "$(dirname $0)"/..
+
+# find the installers and run them iteratively
+find . -name install.sh | while read installer ; do sh -c "${installer}" ; done
