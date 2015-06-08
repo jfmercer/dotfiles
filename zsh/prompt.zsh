@@ -28,6 +28,10 @@
 CURRENT_BG='NONE'
 SEGMENT_SEPARATOR=''
 
+# git theming default: Variables for theming the git info prompt
+ZSH_THEME_GIT_PROMPT_DIRTY="*"              # Text to display if the branch is dirty
+ZSH_THEME_GIT_PROMPT_CLEAN=""               # Text to display if the branch is clean
+
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
 # rendering default background/foreground.
@@ -68,18 +72,19 @@ prompt_context() {
 # Taken from oh-my-zsh/lib/git.zsh
 # Checks if working tree is dirty
 parse_git_dirty() {
+  echo "HELLO THERE"
   local STATUS=''
   local FLAGS
-  FLAGS=('--porcelain')
-  if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
-    if [[ $POST_1_7_2_GIT -gt 0 ]]; then
-      FLAGS+='--ignore-submodules=dirty'
-    fi
-    if [[ "$DISABLE_UNTRACKED_FILES_DIRTY" == "true" ]]; then
-      FLAGS+='--untracked-files=no'
-    fi
-    STATUS=$(command git status ${FLAGS} 2> /dev/null | tail -n1)
-  fi
+  FLAGS=('--porcelain --ignore-submodules=dirty')
+  # if [[ "$(command git config --get status.hide-dirty)" != "1" ]]; then
+    # if [[ $POST_1_7_2_GIT -gt 0 ]]; then
+    #   FLAGS+='--ignore-submodules=dirty'
+    # fi
+    # if [[ "$DISABLE_UNTRACKED_FILES_DIRTY" == "true" ]]; then
+    #   FLAGS+='--untracked-files=no'
+    # fi
+  STATUS=$(command git status ${FLAGS} 2> /dev/null | tail -n1)
+  # fi
   if [[ -n $STATUS ]]; then
     echo "$ZSH_THEME_GIT_PROMPT_DIRTY"
   else
@@ -94,7 +99,7 @@ prompt_git() {
 
   if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
     dirty=$(parse_git_dirty)
-    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="➦ $(git show-ref --head -s --abbrev |head -n1 2> /dev/null)"
+    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="➦ $(git show-ref --head -s --abbrev | head -n1 2> /dev/null)"
     if [[ -n $dirty ]]; then
       prompt_segment yellow black
     else
@@ -190,11 +195,11 @@ prompt_status() {
 build_prompt() {
   RETVAL=$?
   prompt_status
-  prompt_virtualenv
+  # prompt_virtualenv
   prompt_context
   prompt_dir
   prompt_git
-  prompt_hg
+  # prompt_hg
   prompt_end
 }
 

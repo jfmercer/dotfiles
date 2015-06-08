@@ -17,7 +17,7 @@ brew update
 
 myTaps=( homebrew/completions homebrew/dupes homebrew/php homebrew/services homebrew/versions )
 
-myBrew=(ansible autoconf bash bash-completion brew-php-switcher colordiff coreutils cowsay findutils fortune git git-crypt grc hub mcrypt moreutils mysql node pkg-config python python3 ssh-copy-id subversion tig tree "vim --override-system-vi --with-python3" wget zsh zsh-completions zsh-syntax-highlighting )
+myBrew=(ansible autoconf bash bash-completion brew-php-switcher colordiff coreutils cowsay findutils fortune git git-crypt grc hub mcrypt moreutils node pkg-config python python3 ssh-copy-id subversion tig tree "vim --override-system-vi --with-python3" wget zsh zsh-completions zsh-syntax-highlighting )
 
 myDupes=( awk bzip2 grep gzip less make unzip whois )
 

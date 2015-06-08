@@ -8,7 +8,8 @@ export MANPAGER="less -X"
 export LESS_TERMCAP_md="$ORANGE"
 # set $SHELL
 export SHELL="/usr/local/bin/zsh"
-# Larger bash history (allow 32³ entries; default is 500)
+export HISTFILE=~/.zsh_history
+# Larger zsh history (allow 32³ entries; default is 500)
 export HISTSIZE=32768
 export HISTFILESIZE=$HISTSIZE
 export HISTCONTROL=ignoredups
@@ -20,4 +21,3 @@ export JAVA7_HOME=`/usr/libexec/java_home -v 1.7`
 # export JAVA8_HOME=`/usr/libexec/java_home -v 1.8`
 export JAVA_HOME=$JAVA7_HOME
 # export MAVEN_HOME=/usr/local/Cellar/maven/
-
