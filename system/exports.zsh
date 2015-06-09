@@ -21,3 +21,6 @@ export JAVA7_HOME=`/usr/libexec/java_home -v 1.7`
 # export JAVA8_HOME=`/usr/libexec/java_home -v 1.8`
 export JAVA_HOME=$JAVA7_HOME
 # export MAVEN_HOME=/usr/local/Cellar/maven/
+
+# Disables automatic cowsay on Ansible
+export ANSIBLE_NOCOWS=1
