@@ -1,0 +1,73 @@
+# git user & Github credentials are set as env variables. See README for more info.
+
+[color]
+    branch = true
+    diff = true
+    grep = true
+    interactive = true
+    status = true
+    ui = true
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "diff"]
+    meta = yellow bold
+    frag = magenta bold
+    old = red bold
+    new = green bold
+
+[color "interactive"]
+    error = red bold
+
+[color "status"]
+    added = yellow
+    changed = green
+    untracked = red
+    branch = magenta
+
+[core]
+    excludesfile = ~/.gitignore
+    editor = vim
+    # the default is 'less -FRSX'
+    # pager = less
+
+[credential]
+    helper = osxkeychain
+
+# Any git pull or git fetch will auto-prune, that is, any local branch whose
+# corresponding remote is gone will be deleted.
+[fetch]
+    prune = true
+
+[github]
+    user = jfmercer
+
+[push]
+    # This is the default in Git 2.0
+    default = simple
+
+[user]
+    name = John F. Mercer
+    email = john.f.mercer@gmail.com
+
+[merge]
+    conflictStyle = diff3
+
+########## Kaleidoscope ##########
+
+[diff]
+    tool = Kaleidoscope
+[difftool]
+    prompt = false
+[difftool "Kaleidoscope"]
+    cmd = ksdiff --partial-changeset --relative-path \"$MERGED\" -- \"$LOCAL\" \"$REMOTE\"
+[merge]
+    tool = Kaleidoscope
+[mergetool]
+    prompt = false
+[mergetool "Kaleidoscope"]
+    cmd = ksdiff --merge --output \"$MERGED\" --base \"$BASE\" -- \"$LOCAL\" --snapshot \"$REMOTE\" --snapshot
+    trustexitcode = true
