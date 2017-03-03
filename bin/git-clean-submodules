@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# If any changes to a submodule mark the submodule as
+# "dirty" when "git status" is run, this command will
+# restore the submodules to their original condition,
+# thus dispelling the "dirty" notification from "git status"
+#
+# Cf. http://stackoverflow.com/a/4874323/754842
+#
+
+git submodule foreach --recursive git checkout .

@@ -1,0 +1,28 @@
+# DO NOT RENAME THIS FILE
+# unless you enjoy infinite loops
+
+export DOTFILES="$HOME/.dotfiles"
+# declare an array of our .zsh files
+# -U removes duplicate values
+typeset -U config_files
+config_files=($DOTFILES/**/*.zsh)
+
+if [[ -a $HOME/.localrc ]]
+then
+  source $HOME/.localrc
+fi
+
+# load .zsh files
+for file in ${config_files}
+do
+  source $file
+done
+
+# initialize autocomplete here, otherwise functions won't be loaded
+autoload -U compinit
+compinit
+
+# completions
+fpath=(/usr/local/share/zsh-completions $fpath)
+
+unset config_files

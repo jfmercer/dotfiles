@@ -5,14 +5,6 @@
 # ZSH_THEME="af-magic"
 ZSH_THEME="agnoster"
 
-source $HOME/.dotfiles/alii.zsh
-source $HOME/.dotfiles/exports.zsh
-source $HOME/.dotfiles/git/git-alii.zsh
-source $HOME/.localrc
-
-# completions
-fpath=(/usr/local/share/zsh-completions $fpath)
-
 # Uncomment the following line to use case-sensitive completion.
 # CASE_SENSITIVE="true"
 

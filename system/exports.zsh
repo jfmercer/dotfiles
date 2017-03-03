@@ -1,4 +1,3 @@
-export PATH=$HOME/.yarn/bin:$HOME/.n/bin:$PWD/node_modules/bin:$PATH
 export EDITOR="vim"
 export SHELL="/usr/local/bin/zsh"
 export N_PREFIX=$HOME/.n
