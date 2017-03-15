@@ -1,0 +1,21 @@
+# PATH is set in .zshenv rather than .zshrc so that
+# it is used by both interactive and non-interactive
+# shells
+
+# On some systems (macOS, Arch), the PATH should be set
+# elsewhere. On macOS, the path_helper utility does it.
+
+# These load in reverse order, from bottom to top
+typeset paths
+
+if [[ uname =~ "Darwin" ]]; then
+  paths=($PWD/node_modules/bin
+        $HOME/.n/bin)
+
+  for p in ${paths}
+  do
+    export PATH=$p:$PATH
+  done
+
+  unset paths
+fi
