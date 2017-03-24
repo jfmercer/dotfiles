@@ -26,3 +26,6 @@ compinit
 fpath=(/usr/local/share/zsh-completions $fpath)
 
 unset config_files
+
+# Fixes wonky control flow issues
+stty -ixon -ixoff
