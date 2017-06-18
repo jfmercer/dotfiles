@@ -9,9 +9,11 @@
 if [[ "$(uname -s)" =~ "Darwin" ]]; then
   typeset paths
 
-  paths=($PWD/node_modules/bin
+  paths=(
+        # $PWD/node_modules/bin
         $HOME/.n/bin
-        $DOTFILES/bin)
+        $DOTFILES/bin
+        $HOME/.rbenv/shims)
 
   for p in ${paths}
   do
