@@ -37,37 +37,37 @@ values."
      ;; <M-m f e R> (Emacs style) to install them.
      ;; ----------------------------------------------------------------
      auto-completion
-     (c-c++ :variables
-            c-c++-enable-clang-support t)
-     clojure
+     ;; (c-c++ :variables
+     ;;        c-c++-enable-clang-support t)
+     ;; clojure
      (colors :variables
              colors-enable-nyan-cat-progress-bar nil)
      csv
-     django
+     ;; django
      docker
-     elixir
-     elm
-     erlang
+     ;; elixir
+     ;; elm
+     ;; erlang
      emacs-lisp
      ;; irc settings
      ;; SPC-a-i-D to login with authinfo.gpg settings
      ;; gpg2 path must be set below
-     (erc :variables
-          erc-server-list
-          '(("irc.freenode.net"
-             :port 6697
-             :ssl t
-             :nick "jfmercer")
-            ("irc.gitter.im"
-             :port 6697
-             :ssl t
-             :nick "jfmercer")))
+     ;; (erc :variables
+     ;;      erc-server-list
+     ;;      '(("irc.freenode.net"
+     ;;         :port 6697
+     ;;         :ssl t
+     ;;         :nick "jfmercer")
+     ;;        ("irc.gitter.im"
+     ;;         :port 6697
+     ;;         :ssl t
+     ;;         :nick "jfmercer")))
      git
-     go
+     ;; go
      haskell
      helm
      html
-     java
+     ;; java
      javascript
      (markdown :variables
                ;; enables github-flavored markdown
@@ -77,20 +77,22 @@ values."
      (osx :variables
           osx-dictionary-dictionary-choice "English")
      ;; pdf-tools
-     php
+     ;; php
+     ;; purescript
      python
-     racket
+     ;; racket
      react
      ruby
      ruby-on-rails
-     rust
-     scala
+     ;; rust
+     ;; scala
      scheme
      (shell :variables
             shell-default-shell 'term
             shell-default-term-shell (getenv "SHELL"))
      shell-scripts
      ;; spell-checking
+     ;; sql
      syntax-checking
      typescript
      yaml
@@ -99,7 +101,7 @@ values."
    ;; wrapped in a layer. If you need some configuration for these
    ;; packages, then consider creating a layer. You can also put the
    ;; configuration in `dotspacemacs/user-config'.
-   dotspacemacs-additional-packages '()
+   dotspacemacs-additional-packages '(color-theme-solarized)
    ;; A list of packages that cannot be updated.
    dotspacemacs-frozen-packages '()
    ;; A list of packages that will not be installed and loaded.
@@ -171,8 +173,8 @@ values."
    ;; List of themes, the first of the list is loaded when spacemacs starts.
    ;; Press <SPC> T n to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
-   dotspacemacs-themes '(sanityinc-solarized-dark
-                         spacemacs-dark)
+   ;; dotspacemacs-themes ;;'(sanityinc-solarized-dark
+                          ;;  spacemacs-dark)
    ;; If non nil the cursor color matches the state color in GUI Emacs.
    dotspacemacs-colorize-cursor-according-to-state t
    ;; Default font, or prioritized list of fonts. `powerline-scale' allows to
@@ -265,7 +267,7 @@ values."
    dotspacemacs-loading-progress-bar t
    ;; If non nil the frame is fullscreen when Emacs starts up. (default nil)
    ;; (Emacs 24.4+ only)
-   dotspacemacs-fullscreen-at-startup nil
+   dotspacemacs-fullscreen-at-startup t
    ;; If non nil `spacemacs/toggle-fullscreen' will not use native fullscreen.
    ;; Use to disable fullscreen animations in OSX. (default nil)
    dotspacemacs-fullscreen-use-non-native nil
@@ -291,8 +293,18 @@ values."
    ;; scrolling overrides the default behavior of Emacs which recenters point
    ;; when it reaches the top or bottom of the screen. (default t)
    dotspacemacs-smooth-scrolling t
-   ;; If non nil line numbers are turned on in all `prog-mode' and `text-mode'
-   ;; derivatives. If set to `relative', also turns on relative line numbers.
+   ;; Control line numbers activation.
+   ;; If set to `t' or `relative' line numbers are turned on in all `prog-mode' and
+   ;; `text-mode' derivatives. If set to `relative', line numbers are relative.
+   ;; This variable can also be set to a property list for finer control:
+   ;; '(:relative nil
+   ;;   :disabled-for-modes dired-mode
+   ;;                       doc-view-mode
+   ;;                       markdown-mode
+   ;;                       org-mode
+   ;;                       pdf-view-mode
+   ;;                       text-mode
+   ;;   :size-limit-kb 1000)
    ;; (default nil)
    dotspacemacs-line-numbers nil
    ;; Code folding method. Possible values are `evil' and `origami'.
@@ -344,6 +356,35 @@ layers configuration.
 This is the place where most of your configurations should be done. Unless it is
 explicitly specified that a variable should be set before a package is loaded,
 you should place your code here."
+
+  ;; CUSTOM SOLARIZED THEME TWEAKS
+  ;; cf. http://philipdaniels.com/blog/2017/02/spacemacs---configuring-the-solarized-theme/
+
+  ;; Get color-theme-solarized working. It is specified as an additional package
+  ;; above. First we setup some theme modifications - we must do this *before*
+  ;; we load the theme. Note that the color-theme-solarized package appears in
+  ;; the list of themes as plain old 'solarized'.
+  (setq theming-modifications
+        '((solarized
+           ;; Provide a sort of "on-off" modeline whereby the current buffer has a nice
+           ;; bright blue background, and all the others are in cream.
+           ;; TODO: Change to use variables here. However, got error:
+           ;; (Spacemacs) Error in dotspacemacs/user-config: Wrong type argument: stringp, pd-blue
+           (mode-line :foreground "#e9e2cb" :background "#2075c7" :inverse-video nil)
+           (powerline-active1 :foreground "#e9e2cb" :background "#2075c7" :inverse-video nil)
+           (powerline-active2 :foreground "#e9e2cb" :background "#2075c7" :inverse-video nil)
+           (mode-line-inactive :foreground "#2075c7" :background "#e9e2cb" :inverse-video nil)
+           (powerline-inactive1 :foreground "#2075c7" :background "#e9e2cb" :inverse-video nil)
+           (powerline-inactive2 :foreground "#2075c7" :background "#e9e2cb" :inverse-video nil)
+           ;; Make a really prominent helm selection line.
+           (helm-selection :foreground "white" :background "red" :inverse-video nil)
+           ;; See comment above about dotspacemacs-colorize-cursor-according-to-state.
+           (cursor :background "#b58900")
+         )))
+  (set-terminal-parameter nil 'background-mode 'dark)
+  (set-frame-parameter nil 'background-mode 'dark)
+  (spacemacs/load-theme 'solarized)
+
   (setq
     ;; gpg
     epg-gpg-program "/usr/local/MacGPG2/bin/gpg2"
@@ -365,6 +406,8 @@ you should place your code here."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(ansi-color-faces-vector
+   [default bold shadow italic underline bold bold-italic bold])
  '(ansi-color-names-vector
    ["#d2ceda" "#f2241f" "#67b11d" "#b1951d" "#3a81c3" "#a31db1" "#21b8c7" "#655370"])
  '(compilation-message-face (quote default))
@@ -404,7 +447,7 @@ you should place your code here."
     ("#dc322f" "#cb4b16" "#b58900" "#546E00" "#B4C342" "#00629D" "#2aa198" "#d33682" "#6c71c4")))
  '(package-selected-packages
    (quote
-    (racket-mode faceup projectile-rails pony-mode ob-elixir noflet go-guru go-eldoc flycheck-mix flycheck-elm feature-mode erlang ensime sbt-mode scala-mode elm-mode disaster company-go go-mode company-emacs-eclim eclim company-c-headers cmake-mode clang-format alchemist elixir-mode toml-mode rvm ruby-tools ruby-test-mode rubocop rspec-mode robe rbenv rake racer phpunit phpcbf php-extras php-auto-yasnippets minitest intero hlint-refactor hindent helm-hoogle haskell-snippets flycheck-rust flycheck-haskell drupal-mode php-mode csv-mode company-ghci company-ghc ghc haskell-mode company-cabal cmm-mode clojure-snippets clj-refactor inflections edn paredit peg cider-eval-sexp-fu cider seq queue clojure-mode chruby cargo rust-mode bundler inf-ruby vmd-mode dockerfile-mode docker docker-tramp reveal-in-osx-finder pbcopy osx-trash osx-dictionary launchctl yapfify tide typescript-mode pyvenv pytest pyenv-mode py-isort pip-requirements live-py-mode insert-shebang hy-mode helm-pydoc geiser fish-mode cython-mode company-shell company-anaconda anaconda-mode pythonic rainbow-mode rainbow-identifiers color-identifiers-mode magit-gh-pulls github-search github-clone github-browse-file gist gh marshal logito pcache ht grandshell-theme molokai-theme sublime-themes reverse-theme sass-mode company-web web-mode tagedit slim-mode scss-mode pug-mode less-css-mode helm-css-scss haml-mode emmet-mode web-completion-data solarized-theme helm-company helm-c-yasnippet flyspell-correct-helm flyspell-correct flycheck-pos-tip pos-tip flycheck company-tern dash-functional company-statistics company auto-yasnippet auto-dictionary ac-ispell auto-complete tern mmm-mode markdown-toc markdown-mode gh-md erc-yt erc-view-log erc-terminal-notifier erc-social-graph erc-image erc-hl-nicks pdf-tools tablist xterm-color shell-pop multi-term eshell-z eshell-prompt-extras esh-help smeargle orgit org magit-gitflow helm-gitignore gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link evil-magit magit magit-popup git-commit with-editor web-beautify livid-mode skewer-mode simple-httpd json-mode json-snatcher json-reformat js2-refactor yasnippet multiple-cursors js2-mode js-doc coffee-mode yaml-mode ws-butler window-numbering which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org spaceline powerline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el paradox spinner org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint info+ indent-guide ido-vertical-mode hydra hungry-delete hl-todo highlight-parentheses highlight-numbers parent-mode highlight-indentation hide-comnt help-fns+ helm-themes helm-swoop helm-projectile helm-mode-manager helm-make projectile pkg-info epl helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido flx fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state smartparens evil-indent-plus evil-iedit-state iedit evil-exchange evil-escape evil-ediff evil-args evil-anzu anzu evil goto-chg undo-tree eval-sexp-fu highlight elisp-slime-nav dumb-jump f s diminish define-word column-enforce-mode clean-aindent-mode bind-map bind-key auto-highlight-symbol auto-compile packed dash aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line helm avy helm-core popup async quelpa package-build spacemacs-theme)))
+    (color-theme-solarized color-theme winum fuzzy racket-mode faceup projectile-rails pony-mode ob-elixir noflet go-guru go-eldoc flycheck-mix flycheck-elm feature-mode erlang ensime sbt-mode scala-mode elm-mode disaster company-go go-mode company-emacs-eclim eclim company-c-headers cmake-mode clang-format alchemist elixir-mode toml-mode rvm ruby-tools ruby-test-mode rubocop rspec-mode robe rbenv rake racer phpunit phpcbf php-extras php-auto-yasnippets minitest intero hlint-refactor hindent helm-hoogle haskell-snippets flycheck-rust flycheck-haskell drupal-mode php-mode csv-mode company-ghci company-ghc ghc haskell-mode company-cabal cmm-mode clojure-snippets clj-refactor inflections edn paredit peg cider-eval-sexp-fu cider seq queue clojure-mode chruby cargo rust-mode bundler inf-ruby vmd-mode dockerfile-mode docker docker-tramp reveal-in-osx-finder pbcopy osx-trash osx-dictionary launchctl yapfify tide typescript-mode pyvenv pytest pyenv-mode py-isort pip-requirements live-py-mode insert-shebang hy-mode helm-pydoc geiser fish-mode cython-mode company-shell company-anaconda anaconda-mode pythonic rainbow-mode rainbow-identifiers color-identifiers-mode magit-gh-pulls github-search github-clone github-browse-file gist gh marshal logito pcache ht grandshell-theme molokai-theme sublime-themes reverse-theme sass-mode company-web web-mode tagedit slim-mode scss-mode pug-mode less-css-mode helm-css-scss haml-mode emmet-mode web-completion-data solarized-theme helm-company helm-c-yasnippet flyspell-correct-helm flyspell-correct flycheck-pos-tip pos-tip flycheck company-tern dash-functional company-statistics company auto-yasnippet auto-dictionary ac-ispell auto-complete tern mmm-mode markdown-toc markdown-mode gh-md erc-yt erc-view-log erc-terminal-notifier erc-social-graph erc-image erc-hl-nicks pdf-tools tablist xterm-color shell-pop multi-term eshell-z eshell-prompt-extras esh-help smeargle orgit org magit-gitflow helm-gitignore gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link evil-magit magit magit-popup git-commit with-editor web-beautify livid-mode skewer-mode simple-httpd json-mode json-snatcher json-reformat js2-refactor yasnippet multiple-cursors js2-mode js-doc coffee-mode yaml-mode ws-butler window-numbering which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org spaceline powerline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el paradox spinner org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint info+ indent-guide ido-vertical-mode hydra hungry-delete hl-todo highlight-parentheses highlight-numbers parent-mode highlight-indentation hide-comnt help-fns+ helm-themes helm-swoop helm-projectile helm-mode-manager helm-make projectile pkg-info epl helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido flx fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state smartparens evil-indent-plus evil-iedit-state iedit evil-exchange evil-escape evil-ediff evil-args evil-anzu anzu evil goto-chg undo-tree eval-sexp-fu highlight elisp-slime-nav dumb-jump f s diminish define-word column-enforce-mode clean-aindent-mode bind-map bind-key auto-highlight-symbol auto-compile packed dash aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line helm avy helm-core popup async quelpa package-build spacemacs-theme)))
  '(pos-tip-background-color "#073642")
  '(pos-tip-foreground-color "#93a1a1")
  '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#073642" 0.2))
