@@ -50,8 +50,20 @@ ZSH_THEME="agnoster"
 
 ## CAVEAT LECTOR
 ## Plugins may interfere with dotfile alii
-# plugins=(codeclimate colorized-man-pages docker extract git git-extras
-#        ng node npm osx tig yarn)
+plugins=(
+#  codeclimate
+  colorize
+  colorized-man-pages
+  command-not-found
+  docker
+  extract
+#  git
+#  git-extras
+  ng
+  npm
+  osx
+  yarn
+)
 
 source $ZSH/oh-my-zsh.sh
 
