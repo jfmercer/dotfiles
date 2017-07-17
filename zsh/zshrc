@@ -7,10 +7,8 @@ export DOTFILES="$HOME/.dotfiles"
 typeset -U config_files
 config_files=($DOTFILES/**/*.zsh)
 
-if [[ -a $HOME/.localrc ]]
-then
-  source $HOME/.localrc
-fi
+# load antibody plugins
+source ~/.zsh_plugins.sh
 
 # load .zsh files
 for file in ${config_files}
@@ -22,10 +20,16 @@ done
 autoload -U compinit
 compinit
 
-# completions
+# completions - load *after* autoload completes
 fpath=(/usr/local/share/zsh-completions $fpath)
 
 unset config_files
+
+# top secret
+if [[ -a $HOME/.localrc ]]
+then
+  source $HOME/.localrc
+fi
 
 # Fixes wonky control flow issues
 stty -ixon -ixoff

@@ -28,9 +28,6 @@ alias ln="ln -i"
 # Enable sudo to be sudo’ed
 alias sudo 'sudo '
 
-# Get OS X Software Updates, update Homebrew itself, and upgrade installed Homebrew packages
-alias update 'sudo softwareupdate -i -a; brew update; brew upgrade; brew prune; brew cleanup'
-
 # IP addresses
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 alias localip="ipconfig getifaddr en1"
