@@ -1,5 +1,5 @@
 export EDITOR="vim"
-export SHELL="/usr/local/bin/zsh"
+export SHELL="$(which zsh)"
 export N_PREFIX=$HOME/.n
 export ANSIBLE_NOCOWS=1
 
