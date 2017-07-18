@@ -13,11 +13,19 @@
     local = yellow
     remote = green
 
+[color "diff-highlight"]
+    oldNormal = red bold
+    oldHighlight = red bold 52
+    newNormal = green bold
+    newHighlight = green bold 22
+
 [color "diff"]
-    meta = yellow bold
+    meta = 227
     frag = magenta bold
+    commit = 227 bold
     old = red bold
     new = green bold
+    whitespace = red reverse
 
 [color "interactive"]
     error = red bold
@@ -32,7 +40,7 @@
     excludesfile = ~/.gitignore
     editor = vim
     # the default is 'less -FRSX'
-    # pager = less
+    # pager = diff-so-fancy | less --tabs=4 -RFX
 
 [credential]
     helper = osxkeychain
