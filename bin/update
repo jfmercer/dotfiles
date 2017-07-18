@@ -1,8 +1,0 @@
-#!/bin/bash
-
-brew update;
-
-clear;
-
-brew outdated;
-
