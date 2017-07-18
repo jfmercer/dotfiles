@@ -1,0 +1,63 @@
+// Place your settings in this file to overwrite the default settings
+{
+    // stylelint settings
+    // css.validate should be disabled while using the stylelint extension
+    "stylelint.enable": true,
+    // "css.validate": false,
+
+    // Integrated TERMINAL Settings
+    "terminal.integrated.fontFamily": "Inconsolata-dz for Powerline",
+    "terminal.integrated.fontSize": 16,
+
+    // Controls the font size.
+    "editor.fontSize": 18,
+
+    // Controls whether the editor should render whitespace characters
+    "editor.renderWhitespace": "boundary",
+
+    // Columns at which to show vertical rulers
+    "editor.rulers": [80, 120],
+
+    // The number of spaces a tab is equal to.
+    "editor.tabSize": 2,
+
+    // Controls auto save of dirty files. Accepted values:  "off", "afterDelay", "onFocusChange". If set to "afterDelay" you can configure the delay in "files.autoSaveDelay".
+    "files.autoSave": "off",
+
+    // Controls if the minimap is shown
+    "editor.minimap.enabled": false,
+
+    // Controls how the editor should render the current line highlight, possibilities are 'none', 'gutter', 'line', and 'all'.
+    "editor.renderLineHighlight": "none",
+
+    // Configure glob patterns for excluding files and folders in searches. Inherits all glob patterns from the files.exclude setting.
+    "search.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/tmp": true,
+        "**/vendor": true,
+        "**/build": true,
+        "**/coverage": true,
+        "**/typings": true
+    },
+
+    // npm-intellisense plugin
+    "npm-intellisense.scanDevDependencies": true,
+
+    "typescript.check.tscVersion": false,
+
+    // Controls if opened editors should show with an icon or not. This requires an icon theme to be enabled as well.
+    "workbench.editor.showIcons": true,
+    "window.zoomLevel": 0,
+
+    "editor.cursorBlinking": "solid",
+    "workbench.iconTheme": "vs-seti",
+    "[cpp]": {
+      "editor.quickSuggestions": false
+    },
+    "[c]": {
+      "editor.quickSuggestions": false
+    },
+    "workbench.colorTheme": "FlatUI Dark"
+  }
