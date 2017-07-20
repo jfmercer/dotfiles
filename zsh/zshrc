@@ -2,6 +2,10 @@
 # unless you enjoy infinite loops
 
 export DOTFILES="$HOME/.dotfiles"
+
+# The prompt must be loaded first
+source $DOTFILES/zsh/prompt.zsh
+
 # declare an array of our .zsh files
 # -U removes duplicate values
 typeset -U config_files
