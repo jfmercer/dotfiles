@@ -1,5 +1,6 @@
 #!/bin/bash
 
+ln -s ~/.dotfiles/cider ~/.cider
 ln -s ~/.dotfiles/git/gitconfig ~/.gitconfig
 ln -s ~/.dotfiles/git/gitignore ~/.gitignore
 ln -s ~/.dotfiles/zsh/hushlogin ~/.hushlogin

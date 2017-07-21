@@ -1,5 +1,6 @@
 #!/bin/bash
 
+rm ~/.cider
 rm ~/.gitconfig
 rm ~/.gitignore
 rm ~/.hushlogin
