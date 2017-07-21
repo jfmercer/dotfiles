@@ -1,6 +1,7 @@
 #!/bin/bash
 
 rm ~/.cider
+rm ~/.config/karabiner
 rm ~/.gitconfig
 rm ~/.gitignore
 rm ~/.hushlogin
