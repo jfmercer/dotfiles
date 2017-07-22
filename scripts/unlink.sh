@@ -7,5 +7,7 @@ rm ~/.gitconfig
 rm ~/.gitignore
 rm ~/.hushlogin
 rm ~/.tmux.conf
+rm ~/.vim
+rm ~/.vimrc
 rm ~/.zshenv
 rm ~/.zshrc
