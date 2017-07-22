@@ -97,7 +97,7 @@ formulas:
 - !!python/unicode 'tree'
 - !!python/unicode 'unzip'
 - !!python/unicode 'vagrant-completion'
-- !!python/unicode 'vim'
+- !!python/unicode 'vim --with-override-system-vi'
 - !!python/unicode 'wget'
 - !!python/unicode 'whois'
 - !!python/unicode 'yarn'

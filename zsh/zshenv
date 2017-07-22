@@ -1,1 +1,6 @@
-source $HOME/.dotfiles/system/path
+# When needed, set PATH in .zshenv rather than .zshrc so that
+# it will be used by both interactive and non-interactive
+# shells
+
+# On some systems (macOS, Arch), the PATH should be set
+# elsewhere. On macOS, the path_helper utility does it.
