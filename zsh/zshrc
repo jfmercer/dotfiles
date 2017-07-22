@@ -49,3 +49,7 @@ fi
 
 # Fixes wonky control flow issues
 stty -ixon -ixoff
+
+# fzf fuzzy finder
+# this goes last, I think
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
