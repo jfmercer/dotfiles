@@ -1,6 +1,7 @@
 # zsh plugins
 mafredri/zsh-async
 molovo/tipz
+qianxinfeng/vscode
 zsh-users/zsh-completions
 zsh-users/zsh-autosuggestions
 
