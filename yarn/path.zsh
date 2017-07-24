@@ -2,5 +2,9 @@
 
 if (( $+commands[yarn] ))
 then
-  export PATH="$PATH:`yarn global bin`"
+  # warning `yarn global bin` is slow (0.3 sec)
+  # so this path is set "manually"
+  #
+  # This will break if `n` is replaced with `nvm`
+  export PATH="$PATH:$HOME/.n/bin"
 fi

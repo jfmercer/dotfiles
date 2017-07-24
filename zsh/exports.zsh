@@ -1,3 +1,3 @@
 export EDITOR="vim"
-export SHELL="$(which zsh)"
+export SHELL="/bin/zsh"
 export ANSIBLE_NOCOWS=1

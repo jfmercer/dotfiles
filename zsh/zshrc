@@ -1,15 +1,17 @@
+# profiling functions
+# zmodload zsh/zprof
+# for i in $(seq 1 10); do /usr/bin/time /bin/zsh -i -c exit; done
+
+
 # DO NOT RENAME THIS FILE
 # unless you enjoy infinite loops
 
 export DOTFILES="$HOME/.dotfiles"
 
-# The prompt must be loaded first
-source $DOTFILES/zsh/prompt.zsh
-
 # declare an array of our .zsh files
 # -U removes duplicate values
 typeset -U config_files
-config_files=($DOTFILES/**/*.zsh)
+config_files=($DOTFILES/*/*.zsh)
 
 # load the exports files
 for file in ${(M)config_files:#*/exports.zsh}; do
@@ -21,23 +23,20 @@ for file in ${(M)config_files:#*/path.zsh}; do
   source "$file"
 done
 
+# The prompt must be loaded before the prompt
+source $DOTFILES/zsh/prompt.zsh
+
 # load antibody plugins
 source ~/.zsh_plugins.sh
 
-# load everything but the path, exports, and completion files
-for file in ${${config_files:#*/path.zsh}:#*/completion.zsh:#*/exports.zsh}; do
+# load everything but the path and exports files
+for file in ${${config_files:#*/path.zsh}:#*/exports.zsh}; do
   source "$file"
 done
 
 # initialize autocomplete here, otherwise functions won't be loaded
-autoload -U compinit
+autoload -Uz compinit
 compinit
-
-# load every completion after autocomplete loads
-for file in ${(M)config_files:#*/completion.zsh}
-do
-  source $file
-done
 
 unset config_files
 
@@ -53,3 +52,5 @@ stty -ixon -ixoff
 # fzf fuzzy finder
 # this goes last, I think
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# zprof

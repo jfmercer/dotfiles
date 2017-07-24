@@ -10,8 +10,6 @@ setopt NO_LIST_BEEP
 setopt LOCAL_OPTIONS
 # allow functions to have local traps
 setopt LOCAL_TRAPS
-# share history between sessions ???
-setopt SHARE_HISTORY
 # add timestamps to history
 setopt EXTENDED_HISTORY
 setopt PROMPT_SUBST

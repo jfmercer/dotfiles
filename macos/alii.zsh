@@ -1,5 +1,3 @@
-if [ "$(uname -s)" = "Darwin" ]; then
-
 # OS X has no `md5sum`, so use `md5` as a fallback
 alias md5sum="md5"
 
@@ -34,5 +32,3 @@ alias cleardl="sqlite3 ~/Library/Preferences/com.apple.LaunchServices.Quarantine
 
 # Open file in Marked 2
 alias oim="open -a /Applications/Marked\ 2.app/"
-
-fi

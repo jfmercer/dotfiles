@@ -1,12 +1,9 @@
 # zsh plugins
-mafredri/zsh-async
-molovo/tipz
-qianxinfeng/vscode
-zsh-users/zsh-completions
+mafredri/zsh-async # required by sindresorhus/pure
+# zsh-users/zsh-completions
 zsh-users/zsh-autosuggestions
 
 # These go last
-# sindresorhus/pure
-bhilburn/powerlevel9k
-zsh-users/zsh-syntax-highlighting
+sindresorhus/pure
+# zsh-users/zsh-syntax-highlighting
 zsh-users/zsh-history-substring-search

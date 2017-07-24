@@ -1,14 +1,20 @@
 #!/bin/bash
 
-ln -s ~/.dotfiles/cider ~/.cider
-# ln -s ~/.dotfiles/emacs/.spacemacs ~/.spacemacs
-ln -s ~/.dotfiles/git/gitconfig ~/.gitconfig
-ln -s ~/.dotfiles/git/gitignore ~/.gitignore
-ln -s ~/.dotfiles/zsh/hushlogin ~/.hushlogin
-ln -s ~/.dotfiles/karabiner ~/.config/karabiner
-ln -s ~/.dotfiles/tmux/tmux.conf ~/.tmux.conf
-ln -s ~/.dotfiles/vim ~/.vim
-ln -s ~/.dotfiles/vim/vimrc ~/.vimrc
-ln -s ~/.dotfiles/yarn ~/.config/yarn
-ln -s ~/.dotfiles/zsh/zshenv ~/.zshenv
-ln -s ~/.dotfiles/zsh/zshrc ~/.zshrc
+# force link
+# -f for files
+# -fF for directories
+
+# ln -sf ~/.dotfiles/emacs/.spacemacs ~/.spacemacs
+ln -sf ~/.dotfiles/git/gitconfig ~/.gitconfig
+ln -sf ~/.dotfiles/git/gitignore ~/.gitignore
+ln -sf ~/.dotfiles/zsh/hushlogin ~/.hushlogin
+ln -sf ~/.dotfiles/tmux/tmux.conf ~/.tmux.conf
+ln -sf ~/.dotfiles/vim/vimrc ~/.vimrc
+ln -sf ~/.dotfiles/zsh/zshenv ~/.zshenv
+ln -sf ~/.dotfiles/zsh/zshrc ~/.zshrc
+
+
+ln -sfF ~/.dotfiles/cider ~/.cider
+ln -sfF ~/.dotfiles/karabiner ~/.config/karabiner
+ln -sfF ~/.dotfiles/vim ~/.vim
+ln -sfF ~/.dotfiles/yarn ~/.config/yarn
