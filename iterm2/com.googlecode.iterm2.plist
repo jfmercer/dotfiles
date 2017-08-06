@@ -1186,7 +1186,7 @@
 		<integer>1</integer>
 	</dict>
 	<key>NSWindow Frame NSFontPanel</key>
-	<string>-920 -464 688 545 -2560 -640 2560 1418 </string>
+	<string>514 99 688 411 0 0 1280 778 </string>
 	<key>NSWindow Frame Preferences</key>
 	<string>199 321 606 456 0 0 1280 777 </string>
 	<key>NSWindow Frame SUStatusFrame</key>
@@ -1194,11 +1194,11 @@
 	<key>NSWindow Frame SUUpdateAlert</key>
 	<string>332 289 620 392 0 0 1280 778 </string>
 	<key>NSWindow Frame SharedPreferences</key>
-	<string>-1802 -239 918 495 -2560 -640 2560 1418 </string>
+	<string>210 193 918 495 0 0 1280 778 </string>
 	<key>NSWindow Frame UKCrashReporter</key>
 	<string>80 193 592 584 0 0 1280 777 </string>
 	<key>NSWindow Frame iTerm Window 0</key>
-	<string>-2560 -640 2560 1440 -2560 -640 2560 1418 </string>
+	<string>0 0 1280 800 0 0 1280 778 </string>
 	<key>NSWindow Frame iTerm Window 1</key>
 	<string>1875 -115 1345 652 1280 -640 2560 1418 </string>
 	<key>New Bookmarks</key>
@@ -4155,7 +4155,7 @@
 			<key>Name</key>
 			<string>Flat</string>
 			<key>Non Ascii Font</key>
-			<string>SourceCodePro+Powerline+AwesomeRegular 18</string>
+			<string>InconsolataForPowerline-dz 18</string>
 			<key>Non-ASCII Anti Aliased</key>
 			<true/>
 			<key>Normal Font</key>
@@ -4482,7 +4482,7 @@
 	<key>SUHasLaunchedBefore</key>
 	<true/>
 	<key>SULastCheckTime</key>
-	<date>2017-07-20T19:03:24Z</date>
+	<date>2017-07-23T22:44:47Z</date>
 	<key>SavePasteHistory</key>
 	<false/>
 	<key>Secure Input</key>

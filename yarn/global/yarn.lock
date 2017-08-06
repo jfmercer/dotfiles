@@ -6164,7 +6164,7 @@ shebang-regex@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/shebang-regex/-/shebang-regex-1.0.0.tgz#da42f49740c0b42db2ca9728571cb190c98efea3"
 
-shell-quote@^1.6.1:
+shell-quote@^1.4.1, shell-quote@^1.6.1:
   version "1.6.1"
   resolved "https://registry.yarnpkg.com/shell-quote/-/shell-quote-1.6.1.tgz#f4781949cce402697127430ea3b3c5476f481767"
   dependencies:
@@ -6358,6 +6358,16 @@ split@~1.0.0:
   resolved "https://registry.yarnpkg.com/split/-/split-1.0.0.tgz#c4395ce683abcd254bc28fe1dabb6e5c27dcffae"
   dependencies:
     through "2"
+
+spoof@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/spoof/-/spoof-1.2.0.tgz#7b8b954df47b80798387994718dee14e590db58e"
+  dependencies:
+    chalk "^1.0.0"
+    minimist "^1.1.0"
+    shell-quote "^1.4.1"
+    winreg "^1.1.1"
+    zero-fill "^2.1.0"
 
 sprintf-js@~1.0.2:
   version "1.0.3"
@@ -7448,6 +7458,10 @@ window-size@0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/window-size/-/window-size-0.1.0.tgz#5438cd2ea93b202efa3a19fe8887aee7c94f9c9d"
 
+winreg@^1.1.1:
+  version "1.2.4"
+  resolved "https://registry.yarnpkg.com/winreg/-/winreg-1.2.4.tgz#ba065629b7a925130e15779108cf540990e98d1b"
+
 wordwrap@0.0.2, wordwrap@~0.0.2:
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/wordwrap/-/wordwrap-0.0.2.tgz#b79669bb42ecb409f83d583cad52ca17eaa1643f"
@@ -7700,6 +7714,10 @@ yosay@^2.0.0:
     strip-ansi "^3.0.0"
     taketalk "^1.0.0"
     wrap-ansi "^2.0.0"
+
+zero-fill@^2.1.0:
+  version "2.2.3"
+  resolved "https://registry.yarnpkg.com/zero-fill/-/zero-fill-2.2.3.tgz#a3def06ba5e39ae644850bb4ca2ad4112b4855e9"
 
 zone.js@^0.8.4:
   version "0.8.12"
