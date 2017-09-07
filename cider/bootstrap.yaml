@@ -10,6 +10,7 @@ casks:
 - !!python/unicode 'docker'
 - !!python/unicode 'dropbox'
 - !!python/unicode 'firefox'
+- !!python/unicode 'firefoxnightly'
 - !!python/unicode 'flux'
 - !!python/unicode 'focus'
 - !!python/unicode 'font-anonymous-pro'
