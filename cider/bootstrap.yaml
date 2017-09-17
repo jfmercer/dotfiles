@@ -105,7 +105,6 @@ formulas:
 - !!python/unicode 'whois'
 - !!python/unicode 'yarn'
 - !!python/unicode 'youtube-dl'
-- !!python/unicode 'zsh'
 - !!python/unicode 'zsh-completions'
 - !!python/unicode 'zsh-history-substring-search'
 taps:

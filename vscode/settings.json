@@ -1,63 +1,78 @@
 // Place your settings in this file to overwrite the default settings
 {
-    // stylelint settings
-    // css.validate should be disabled while using the stylelint extension
-    "stylelint.enable": true,
-    // "css.validate": false,
+  // Control the cursor animation style, possible values are 'blink', 'smooth', 'phase', 'expand' and 'solid'
+  "editor.cursorBlinking": "solid",
 
-    // Integrated TERMINAL Settings
-    "terminal.integrated.fontFamily": "Inconsolata-dz for Powerline",
-    "terminal.integrated.fontSize": 16,
+  // Controls the font size.
+  "editor.fontSize": 18,
 
-    // Controls the font size.
-    "editor.fontSize": 18,
+  // Controls the font family.
+  "editor.fontFamily": "Inconsolata-dz for Powerline, Menlo, Monaco, 'Courier New', monospace",
 
-    // Controls whether the editor should render whitespace characters
-    "editor.renderWhitespace": "boundary",
+  // Controls if the minimap is shown
+  "editor.minimap.enabled": false,
 
-    // Columns at which to show vertical rulers
-    "editor.rulers": [80, 120],
+  // Controls how the editor should render the current line highlight, possibilities are 'none', 'gutter', 'line', and 'all'.
+  "editor.renderLineHighlight": "none",
 
-    // The number of spaces a tab is equal to.
-    "editor.tabSize": 2,
+  // Controls whether the editor should render whitespace characters
+  "editor.renderWhitespace": "boundary",
 
-    // Controls auto save of dirty files. Accepted values:  "off", "afterDelay", "onFocusChange". If set to "afterDelay" you can configure the delay in "files.autoSaveDelay".
-    "files.autoSave": "off",
+  // Columns at which to show vertical rulers
+  "editor.rulers": [80, 120],
 
-    // Controls if the minimap is shown
-    "editor.minimap.enabled": false,
+  // The number of spaces a tab is equal to.
+  "editor.tabSize": 2,
 
-    // Controls how the editor should render the current line highlight, possibilities are 'none', 'gutter', 'line', and 'all'.
-    "editor.renderLineHighlight": "none",
+  // Configure file associations to languages (e.g. "*.extension": "html"). These have precedence over the default associations of the languages installed.
+  "files.associations": {
+    "*.conf": "shellscript",
+    "bashrc": "shellscript",
+    "bash_*": "shellscript",
+    "*spacemacs*": "clojure",
+    "*zsh*": "shellscript"
+  },
 
-    // Configure glob patterns for excluding files and folders in searches. Inherits all glob patterns from the files.exclude setting.
-    "search.exclude": {
-        "**/.git": true,
-        "**/node_modules": true,
-        "**/bower_components": true,
-        "**/tmp": true,
-        "**/vendor": true,
-        "**/build": true,
-        "**/coverage": true,
-        "**/typings": true
-    },
+  // Configure glob patterns for excluding files and folders.
+  "files.exclude": {
+    "**/.nyc_output": true
+  },
 
-    // npm-intellisense plugin
-    "npm-intellisense.scanDevDependencies": true,
+  // Scans devDependencies as well
+  "npm-intellisense.scanDevDependencies": true,
 
-    "typescript.check.tscVersion": false,
+  // Configure glob patterns for excluding files and folders in searches. Inherits all glob patterns from the files.exclude setting.
+  "search.exclude": {
+    "**/.git": true,
+    "**/.nyc_output": true,
+    "**/bower_components": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/node_modules": true,
+    "**/tmp": true,
+    "**/typings": true,
+    "**/vendor": true
+  },
 
-    // Controls if opened editors should show with an icon or not. This requires an icon theme to be enabled as well.
-    "workbench.editor.showIcons": true,
-    "window.zoomLevel": 0,
+  // Customizes which terminal application to run on OS X.
+  "terminal.external.osxExec": "iTerm.app",
 
-    "editor.cursorBlinking": "solid",
-    "workbench.iconTheme": "vs-seti",
-    "[cpp]": {
-      "editor.quickSuggestions": false
-    },
-    "[c]": {
-      "editor.quickSuggestions": false
-    },
-    "workbench.colorTheme": "FlatUI Dark"
+  // Integrated TERMINAL Settings
+  "terminal.integrated.fontFamily": "Inconsolata-dz for Powerline",
+  "terminal.integrated.fontSize": 16,
+
+  // The path of the shell that the terminal uses on OS X.
+  "terminal.integrated.shell.osx": "usr/local/bin/zsh",
+
+  // Controls if folders should open in a new window or replace the last active window.
+  // - default: folders will open in a new window unless a folder is picked from within the application (e.g. via the File menu)
+  // - on: folders will open in a new window
+  // - off: folders will replace the last active window
+  // Note that there can still be cases where this setting is ignored (e.g. when using the -new-window or -reuse-window command line option).
+  "window.openFoldersInNewWindow": "on",
+
+  // Controls how windows are being reopened after a restart. Select 'none' to always start with an empty workspace, 'one' to reopen the last window you worked on, 'folders' to reopen all windows that had folders opened or 'all' to reopen all windows of your last session.
+  "window.restoreWindows": "all",
+
+  "workbench.colorTheme": "FlatUI Dark"
   }
