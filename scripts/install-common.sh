@@ -3,7 +3,7 @@
 set -e
 
 # Let's make this pretty
-source ./scripts/echos.sh
+source ./echos.sh
 
 # OS detection
 function is_osx() {
@@ -54,7 +54,7 @@ ln -sf ~/.dotfiles/zsh/hushlogin ~/.hushlogin
 ln -sf ~/.dotfiles/tmux/tmux.conf ~/.tmux.conf
 ln -sfF ~/.dotfiles/vim ~/.vim
 ln -sf ~/.dotfiles/vim/vimrc ~/.vimrc
-ln -sfF ~/.dotfiles/yarn ~/.config/yarn
+# ln -sfF ~/.dotfiles/yarn ~/.config/yarn
 ln -sf ~/.dotfiles/zsh/zshenv ~/.zshenv
 ln -sf ~/.dotfiles/zsh/zshrc ~/.zshrc
 
