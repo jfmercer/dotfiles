@@ -20,7 +20,7 @@ alias v="vim ."
 alias ev="vim ~/.vimrc"
 alias o="open"
 alias oo="open ."
-alias tmux="TERM screen-256color-bce tmux"
+alias tmux="tmux -2"
 alias diff="colordiff"
 
 # I like to protect myself from myself...
