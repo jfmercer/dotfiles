@@ -1,5 +1,6 @@
 #!/bin/bash
 
+rm ~/.gemrc
 rm ~/.gitconfig
 rm ~/.gitignore
 rm ~/.hushlogin
@@ -7,7 +8,6 @@ rm ~/.spacemacs
 rm ~/.tmux.conf
 rm -r ~/.vim
 rm ~/.vimrc
-rm -r ~/.config/yarn
 rm ~/.zshenv
 rm ~/.zshrc
 
