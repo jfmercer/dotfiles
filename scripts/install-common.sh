@@ -51,6 +51,7 @@ ln -sf ~/.dotfiles/git/gitconfig ~/.gitconfig
 ln -sf ~/.dotfiles/git/gitignore ~/.gitignore
 ln -sf ~/.dotfiles/zsh/hushlogin ~/.hushlogin
 # ln -sf ~/.dotfiles/emacs/.spacemacs ~/.spacemacs
+ln -sf ~/.dotfiles/ruby/gemrc ~/.gemrc
 ln -sf ~/.dotfiles/tmux/tmux.conf ~/.tmux.conf
 ln -sfF ~/.dotfiles/vim ~/.vim
 ln -sf ~/.dotfiles/vim/vimrc ~/.vimrc
