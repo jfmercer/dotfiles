@@ -13,7 +13,6 @@ I manage my vim plugins as git submodules with [Vundle](https://github.com/gmari
 * `F2` toggles paste.
 * `F3` toggles NERDTree.
 * `F4` toggles tagbar.
-* `F5` toggles gundo.
 * `,ev` edits your vimrc. The mnemonic is 'e'dit 'v'imrc.
 * `,sv` sources your vimrc. The mnemonic is 's'ource 'v'imrc.
 
@@ -32,8 +31,6 @@ A file tree explorer. Basically, the project drawer you may be missing from Text
 This makes commenting much easier. Select something, `[count]<leader>cc`, done.
 ##### [Tagbar](https://github.com/majutsushi/tagbar)
 Tagbar is for browsing the tags of source code files. It needs to have [Exuberant ctags](http://ctags.sourceforge.net/) installed in order to work.
-##### [Gundo](http://sjl.bitbucket.org/gundo.vim/)
-Gundo views and explorers vim's undo history. vim keeps its undo history in a tree. If you want to escape the hell of the `:undolist` command, then gundo is for you.
 ##### [Syntastic](https://github.com/scrooloose/syntastic)
 Syntastic brings syntax checking to vim. As soon as you save a file, syntastic will check it for syntax errors and list them on the left-hand column. Note that it works with supported syntax checks, and if these are not installed, it won't work. For example, for Python, you need to have `flake8`, `pyflakes`, or `pylint` in your `$PATH`. Jump between errors with `:lnext` and `:lprev`.
 ##### [Easy Motion](https://github.com/Lokaltog/vim-easymotion)
