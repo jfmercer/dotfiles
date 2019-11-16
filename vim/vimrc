@@ -167,7 +167,6 @@ cnoremap <expr> %% getcmdtype() == ':' ? expand('%:h').'/' : '%%'
 set pastetoggle=<F2>                " Toggle paste function for clipboard pasting
 nnoremap <F3> :NERDTreeToggle<CR>   " Toggle NERDTree
 nnoremap <F4> :TagbarToggle<CR>     " Toggle tagbar
-nnoremap <F5> :GundoToggle<CR>      " Toggle gundo
 
 " Disable Arrow Keys
 inoremap  <Up>     <NOP>
