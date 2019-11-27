@@ -4,6 +4,7 @@
 # -f for files
 # -fF for directories
 
+ln -sfF ~/.dotfiles/alacritty ~/.config/alacritty
 ln -sf ~/.dotfiles/git/gitconfig ~/.gitconfig
 ln -sf ~/.dotfiles/git/gitignore ~/.gitignore
 ln -sf ~/.dotfiles/zsh/hushlogin ~/.hushlogin
