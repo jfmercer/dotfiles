@@ -248,10 +248,10 @@ autocmd Filetype java setlocal completefunc=javacomplete#CompleteParamsInfo
 " ================ NERDTree Settings  ======================================
 
 " Open NERDTree on startup
-" autocmd vimenter * NERDTree
+autocmd vimenter * NERDTree
 " Open NERDTree on startup EVEN IF no files were specified
-" autocmd StdinReadPre * let s:std_in=1
-" autocmd vimenter * if !argc() | NERDTree | endif
+autocmd StdinReadPre * let s:std_in=1
+autocmd vimenter * if !argc() | NERDTree | endif
 " Close vim even if the only window left open is NERDTree
 autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
 
