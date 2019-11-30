@@ -59,7 +59,7 @@
 
 [user]
     name = John F. Mercer
-    email = john.f.mercer@gmail.com
+    email = jfmercer@protonmail.com
 
 [merge]
     conflictStyle = diff3
