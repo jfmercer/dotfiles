@@ -18,5 +18,4 @@ ln -sf ~/.dotfiles/zsh/zshrc ~/.zshrc
 
 if [ "$(uname -s)" == "Darwin" ]; then
   ln -sfF ~/.dotfiles/cider ~/.cider
-  ln -sfF ~/.dotfiles/karabiner ~/.config/karabiner
 fi
