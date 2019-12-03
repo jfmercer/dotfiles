@@ -57,3 +57,6 @@ alias unixtime="date +%s"
 
 # File size
 alias fs="stat -c \"%s bytes\""
+
+# weather
+alias we="curl http://wttr.in/ | less -r"
