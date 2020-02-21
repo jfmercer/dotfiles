@@ -79,3 +79,9 @@
 [mergetool "Kaleidoscope"]
     cmd = ksdiff --merge --output \"$MERGED\" --base \"$BASE\" -- \"$LOCAL\" --snapshot \"$REMOTE\" --snapshot
     trustexitcode = true
+[gpg]
+	program = /usr/local/bin/krgpg
+[commit]
+	gpgSign = true
+[tag]
+	forceSignAnnotated = true
