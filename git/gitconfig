@@ -53,6 +53,9 @@
 [github]
     user = jfmercer
 
+[interactive]
+    diffFilter = diff-so-fancy --patch
+
 [push]
     # This is the default in Git 2.0
     default = simple
@@ -63,25 +66,3 @@
 
 [merge]
     conflictStyle = diff3
-
-########## Kaleidoscope ##########
-
-[diff]
-    tool = Kaleidoscope
-[difftool]
-    prompt = false
-[difftool "Kaleidoscope"]
-    cmd = ksdiff --partial-changeset --relative-path \"$MERGED\" -- \"$LOCAL\" \"$REMOTE\"
-[merge]
-    tool = Kaleidoscope
-[mergetool]
-    prompt = false
-[mergetool "Kaleidoscope"]
-    cmd = ksdiff --merge --output \"$MERGED\" --base \"$BASE\" -- \"$LOCAL\" --snapshot \"$REMOTE\" --snapshot
-    trustexitcode = true
-[gpg]
-	program = /usr/local/bin/krgpg
-[commit]
-	gpgSign = true
-[tag]
-	forceSignAnnotated = true
