@@ -115,10 +115,10 @@ set guifont=Menlo\ for\ Powerline:h18
 " set background=dark
 " colorscheme solarized
 
-" ================ Monokai Pro Colorscheme Settings =================
+" ================ Monokai Colorscheme Settings =================
 
-set termguicolors
-colorscheme monokai_pro
+" set termguicolors
+colorscheme monokai
 
 " ================ Key Mappings  ==================================
 
