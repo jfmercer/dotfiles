@@ -31,10 +31,10 @@ source $DOTFILES/zsh/prompt.zsh
 # update by running update-zsh-plugins
 ZPLUGINDIR=$HOME/.dotfiles/plugins/bundle
 source $ZPLUGINDIR/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh
-# source $ZPLUGINDIR/zsh-completions/zsh-completions.plugin.zsh
+source $ZPLUGINDIR/zsh-completions/zsh-completions.plugin.zsh
 source $ZPLUGINDIR/zsh-history-substring-search/zsh-history-substring-search.plugin.zsh
-# source $ZPLUGINDIR/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh
-# source $ZPLUGINDIR/zsh-z/zsh-z.plugin.zsh
+source $ZPLUGINDIR/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh
+source $ZPLUGINDIR/zsh-z/zsh-z.plugin.zsh
 
 # load antibody plugins
 # source ~/.zsh_plugins.sh
