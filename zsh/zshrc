@@ -33,8 +33,9 @@ source $DOTFILES/zsh/prompt.zsh
 ZPLUGINDIR=$HOME/.dotfiles/plugins/bundle
 source $ZPLUGINDIR/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh
 source $ZPLUGINDIR/zsh-completions/zsh-completions.plugin.zsh
-source $ZPLUGINDIR/zsh-history-substring-search/zsh-history-substring-search.plugin.zsh
+# N.B.: Load syntax highlighting *before* history search. Cf. https://github.com/zsh-users/zsh-history-substring-search#usage
 source $ZPLUGINDIR/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh
+source $ZPLUGINDIR/zsh-history-substring-search/zsh-history-substring-search.plugin.zsh
 source $ZPLUGINDIR/zsh-z/zsh-z.plugin.zsh
 
 # load everything but the path and exports files
