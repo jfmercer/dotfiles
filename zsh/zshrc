@@ -29,6 +29,7 @@ source $DOTFILES/zsh/prompt.zsh
 # load plugins without a plugin manager
 # they must first be installed via plugins/install.sh
 # update by running update-zsh-plugins
+# inspiration taken from https://github.com/mattmc3/zsh_unplugged
 ZPLUGINDIR=$HOME/.dotfiles/plugins/bundle
 source $ZPLUGINDIR/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh
 source $ZPLUGINDIR/zsh-completions/zsh-completions.plugin.zsh
