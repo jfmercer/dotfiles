@@ -1,5 +1,5 @@
+git/credentials
 node_modules
-
 plugins/bundle/*
 vim/bundle/*
 vim/doc

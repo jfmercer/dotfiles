@@ -1,4 +1,6 @@
-# git user & Github credentials are set as env variables. See README for more info.
+# Local/private config goes in the include
+[include]
+    path = ~/.dotfiles/git/credentials
 
 [color]
     branch = true
@@ -43,15 +45,13 @@
     pager = diff-so-fancy | less --tabs=4 -RFX
 
 [credential]
-    helper = osxkeychain
+#     helper = osxkeychain
+	authority = basic
 
 # Any git pull or git fetch will auto-prune, that is, any local branch whose
 # corresponding remote is gone will be deleted.
 [fetch]
     prune = true
-
-[github]
-    user = jfmercer
 
 [interactive]
     diffFilter = diff-so-fancy --patch
@@ -59,10 +59,6 @@
 [push]
     # This is the default in Git 2.0
     default = simple
-
-[user]
-    name = John F. Mercer
-    email = jfmercer@protonmail.com
 
 [merge]
     conflictStyle = diff3
