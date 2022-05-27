@@ -4,3 +4,6 @@
 
 # On some systems (macOS, Arch), the PATH should be set
 # elsewhere. On macOS, the path_helper utility does it.
+
+# This command might speed up load times on some systems.
+#skip_global_compinit=1
