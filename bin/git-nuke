@@ -6,7 +6,7 @@
 #
 # Examples
 #
-#   git nuke add-git-nuke
+#   git-nuke foo
 
 git branch -D $1
 git push origin :$1
