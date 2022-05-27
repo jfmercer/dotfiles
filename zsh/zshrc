@@ -36,9 +36,6 @@ source $ZPLUGINDIR/zsh-history-substring-search/zsh-history-substring-search.plu
 source $ZPLUGINDIR/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh
 source $ZPLUGINDIR/zsh-z/zsh-z.plugin.zsh
 
-# load antibody plugins
-# source ~/.zsh_plugins.sh
-
 # load everything but the path and exports files
 for file in ${${config_files:#*/path.zsh}:#*/exports.zsh}; do
   source "$file"

@@ -138,9 +138,6 @@ vim +PluginInstall +qall > /dev/null 2>&1
 bot "installing fonts"
 ./fonts/install.sh
 
-bot "installing antibody plugins"
-./antibody/install.sh
-
 bot "installing fzf"
 ./fzf/install.sh
 

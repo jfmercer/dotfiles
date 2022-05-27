@@ -1,9 +1,0 @@
-# zsh plugins
-mafredri/zsh-async # required by sindresorhus/pure
-# zsh-users/zsh-completions
-zsh-users/zsh-autosuggestions
-
-# These go last
-sindresorhus/pure
-# zsh-users/zsh-syntax-highlighting
-zsh-users/zsh-history-substring-search

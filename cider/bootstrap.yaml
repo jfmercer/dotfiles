@@ -39,7 +39,6 @@ casks:
 - !!python/unicode 'vlc'
 formulas:
 - !!python/unicode 'ansible'
-- !!python/unicode 'antibody'
 - !!python/unicode 'asciiquarium'
 - !!python/unicode 'autoconf'
 - !!python/unicode 'automake'
