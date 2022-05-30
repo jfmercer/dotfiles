@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# Start emacs daemon
-
-emacs --daemon
-# OR brew services start d12frosted/emacs-plus/emacs-plus
-

@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# Stop emacs daemon
-
-emacsclient -e '(kill-emacs)'
-# OR brew services stop d12frosted/emacs-plus/emacs-plus
-
