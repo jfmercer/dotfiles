@@ -1,0 +1,23 @@
+{{- $interactive := stdinIsATTY -}}
+
+{{- $email := "jfmercer@protonmail.com" -}}
+{{- $install_mac_apps := true -}}
+
+{{- if $interactive -}}
+{{-   $email = promptString "email for .gitconfig" -}}
+{{-   if (eq .chezmoi.os "darwin") -}}
+{{-     $install_mac_apps = eq (promptString "Install Mac applications (y/n)") "y" -}}
+{{-   end -}}
+{{- end -}}
+
+verbose: true
+
+diff:
+  # exclude:
+  #   - scripts
+  pager: "diff-so-fancy | less --tabs=4 -RFX"
+
+# Here we "export" the variables, so we can access them outside this file
+data:
+  email: {{ $email | quote }}
+  install_mac_apps: {{ $install_mac_apps }}

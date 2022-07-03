@@ -1,0 +1,46 @@
+{{- if and (eq .chezmoi.os "darwin") .install_mac_apps -}}
+#!/bin/bash
+
+set -eufo pipefail
+
+brew tap homebrew/cask-fonts
+
+{{ $brews := list
+     "bat"
+     "bash-completion"
+     "brew-cask-completion"
+     "cheat"
+     "chezmoi"
+     "ctags"
+     "dockutil"
+     "diff-so-fancy"
+     "exa"
+     "fzf"
+     "gh"
+     "git"
+     "grc"
+     "htop"
+     "jq"
+     "nmap"
+     "shellcheck"
+     "ssh-copy-id"
+     "telnet"
+     "tig"
+     "tmux"
+     "trash"
+     "tree"
+     "vim"
+     "wget" -}}
+{{ $casks := list
+     "firefox"
+     "font-menlo-for-powerline" -}}
+
+brew bundle --no-lock --file=/dev/stdin <<EOF
+{{ range ($brews | sortAlpha | uniq) -}}
+brew "{{ . }}"
+{{ end -}}
+{{ range ($casks | sortAlpha | uniq) -}}
+cask "{{ . }}"
+{{ end -}}
+EOF
+{{ end -}}
