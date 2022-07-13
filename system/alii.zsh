@@ -65,3 +65,6 @@ alias we="curl http://wttr.in/ | less -r"
 
 # dockerize postgres
 alias psql="docker run --rm -it --net=host postgres:12.1 psql"
+
+# chezmoi
+alias cm=chezmoi

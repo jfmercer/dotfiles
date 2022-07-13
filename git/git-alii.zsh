@@ -1,5 +1,3 @@
-# NOTE: Some of these aliases depend on `hub` being installed.
-
 alias egc="vim $HOME/.gitconfig"
 alias egi="vim $HOME/.gitignore"
 alias g="git"
@@ -38,5 +36,5 @@ alias grb="git rebase"
 alias grbd="git rebase develop"
 alias grbm="git rebase master"
 alias grh="git reset HEAD"
-alias gs="git status -sb" # upgrade your git if -sb breaks for you. it's fun.
+alias gs="git status -sb"
 alias gst="git status"

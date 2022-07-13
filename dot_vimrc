@@ -1,16 +1,27 @@
 " John F. Mercer's VIMRC file
 
 set nocompatible        " Disable vi compatibility
-filetype off            " Required by Vundle
 
-" ================ Vundle Setup ===================================
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
+" ================ vim-plug Setup ===================================
+call plug#begin()
 
-Plugin 'VundleVim/Vundle.vim'
-source ~/.vim/bundles.vim
-call vundle#end()
-" ================ End Vundle Setup ===============================
+" Plug 'altercation/vim-colors-solarized'
+Plug 'majutsushi/tagbar'
+Plug 'leafgarland/typescript-vim'
+Plug 'Lokaltog/vim-easymotion'
+Plug 'luochen1990/rainbow'
+Plug 'Raimondi/delimitMate'
+Plug 'scrooloose/nerdcommenter'
+Plug 'scrooloose/nerdtree'
+" Plug 'scrooloose/syntastic'
+Plug 'sickill/vim-monokai'
+Plug 'tpope/vim-fugitive'
+Plug 'tpope/vim-surround'
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+
+call plug#end()
+" ================ End vim-plug Setup ===============================
 
 " ================ General Config =================================
 
@@ -113,12 +124,14 @@ set guifont=Menlo\ for\ Powerline:h18
 
 " set t_Co=256 " Forces 256 colors, unneeded when TERM is already set to 256
 " set background=dark
-" colorscheme solarized
+" `silent!` will keep vim from stalling on the colorscheme line during headless installs
+" silent! colorscheme solarized
 
 " ================ Monokai Colorscheme Settings =================
 
 " set termguicolors
-colorscheme monokai
+" `silent!` will keep vim from stalling on the colorscheme line during headless installs
+silent! colorscheme monokai
 
 " ================ Key Mappings  ==================================
 
@@ -271,14 +284,14 @@ let g:airline_symbols.space = "\ua0"
 
 " ================ Syntastic Settings =========================================
 
-set statusline+=%#warningmsg#
-set statusline+=%{SyntasticStatuslineFlag()}
-set statusline+=%*
+" set statusline+=%#warningmsg#
+" set statusline+=%{SyntasticStatuslineFlag()}
+" set statusline+=%*
 
-let g:syntastic_always_populate_loc_list = 1
-let g:syntastic_auto_loc_list = 1
-let g:syntastic_check_on_open = 1
-let g:syntastic_check_on_wq = 0
+" let g:syntastic_always_populate_loc_list = 1
+" let g:syntastic_auto_loc_list = 1
+" let g:syntastic_check_on_open = 1
+" let g:syntastic_check_on_wq = 0
 
 " Custom file checker configurations
 " Cf. https://github.com/scrooloose/syntastic/wiki/Syntax-Checkers

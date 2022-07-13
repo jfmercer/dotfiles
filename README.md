@@ -1,12 +1,21 @@
 # My Dotfiles
 These are my dotfiles. I hope you find them as helpful as I do.
 
+## Getting started
+
+You can use the [convenience script](./scripts/install_dotfiles.sh) to install the dotfiles on any machine with a single command. Simply run one of the following commands in your terminal:
+
+`wget`
+```bash
+sh -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/migrate-to-chezmoi/scripts/install_dotfiles.sh)"
+```
+
+`curl`:
+```bash
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/migrate-to-chezmoi/scripts/install_dotfiles.sh)"
+```
+
 ### vim
-
-##### A Note Regarding `vim` Plugin Installation
-
-I manage my vim plugins as git submodules with [Vundle](https://github.com/gmarik/vundle).
-
 ##### Key Mappings
 
 * `ESC` is now `jk`. This will save your left pinky from a premature death.
@@ -18,8 +27,6 @@ I manage my vim plugins as git submodules with [Vundle](https://github.com/gmari
 
 ### Plugins
 
-##### [Vundle](https://github.com/gmarik/vundle)
-This manages the runtimepath.
 ##### [Fugitive](https://github.com/tpope/vim-fugitive)
 To quote Tim Pope, it's "a Git wrapper so awesome, it should be illegal."
 ##### [Surround](https://github.com/tpope/vim-surround)
