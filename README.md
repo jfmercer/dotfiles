@@ -7,12 +7,12 @@ You can use the [convenience script](./scripts/install_dotfiles.sh) to install t
 
 `wget`
 ```bash
-sh -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/migrate-to-chezmoi/scripts/install_dotfiles.sh)"
+sh -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
 `curl`:
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/migrate-to-chezmoi/scripts/install_dotfiles.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
 ### vim

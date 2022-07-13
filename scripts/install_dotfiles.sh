@@ -81,7 +81,7 @@ DOTFILES_REPO_HOST=${DOTFILES_REPO_HOST:-"https://github.com"}
 DOTFILES_USER=${DOTFILES_USER:-"jfmercer"}
 DOTFILES_REPO="${DOTFILES_REPO_HOST}/${DOTFILES_USER}/dotfiles"
 # TODO: Change to master
-DOTFILES_BRANCH=${DOTFILES_BRANCH:-"migrate-to-chezmoi"}
+DOTFILES_BRANCH=${DOTFILES_BRANCH:-"master"}
 DOTFILES_DIR="${HOME}/.local/share/chezmoi"
 
 # TODO: Setup Debian package installs
