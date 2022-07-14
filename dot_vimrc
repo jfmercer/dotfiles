@@ -5,9 +5,7 @@ set nocompatible        " Disable vi compatibility
 " ================ vim-plug Setup ===================================
 call plug#begin()
 
-" Plug 'altercation/vim-colors-solarized'
 Plug 'majutsushi/tagbar'
-Plug 'leafgarland/typescript-vim'
 Plug 'Lokaltog/vim-easymotion'
 Plug 'luochen1990/rainbow'
 Plug 'Raimondi/delimitMate'

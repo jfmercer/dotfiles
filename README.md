@@ -1,5 +1,5 @@
 # My Dotfiles
-These are my dotfiles. I hope you find them as helpful as I do.
+These are my dotfiles, managed by [chezmoi](https://github.com/twpayne/chezmoi).
 
 ## Getting started
 
@@ -15,8 +15,8 @@ sh -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/master/sc
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
-### vim
-##### Key Mappings
+## vim
+#### Key Mappings
 
 * `ESC` is now `jk`. This will save your left pinky from a premature death.
 * `F2` toggles paste.
@@ -44,9 +44,16 @@ Syntastic brings syntax checking to vim. As soon as you save a file, syntastic w
 Easy Motion makes it much, much easier to move the cursor around the screen. See @Lokaltog's [introduction](https://github.com/Lokaltog/vim-easymotion#introduction) for details. The short version: hit `<Leader><Leader>` followed by a motion key (say, `<Leader><Leader>w`) and then watch the magic happen.
 ##### [vim-airline](https://github.com/bling/vim-airline)
 A beautiful and very useful vim status line. For this to work properly, you may have to install Powerline-ready fonts, four of which [may be found here](https://github.com/jfmercer/mad/tree/master/fonts).
-##### [vim-solarized](https://github.com/altercation/vim-colors-solarized)
-The best color scheme in the business. It's like a massage for the eyes.
+##### [vim-monokai](https://github.com/sickill/vim-monokai)
+Adds the monokai color scheme.
 ##### [delimitMate](https://github.com/Raimondi/delimitMate)
 Provides insert mode auto-completion for quotes, parentheses, brackets, etc.
-##### [vim-mustache-handlebars](https://github.com/mustache/vim-mustache-handlebars)
-Syntax highlighting and other goodies for [mustache](http://mustache.github.io/) and [handlebars](http://handlebarsjs.com/) templates.
+
+## Credits
+
+I have borrowed heavily from the following:
+* [Zach Holman](https://github.com/holman/dotfiles) - I borrow his topical organization scheme
+* [Mathias Bynens](https://github.com/mathiasbynens/dotfiles) - mainly for his legendary .macos script
+* [Felipe Santos](https://github.com/felipecrs/dotfiles) - chezmoi inspiration
+* [Mike Kasberg](https://github.com/mkasberg/dotfiles) - chezmoi inspiration
+* [Tom Payne](https://github.com/twpayne/dotfiles) - chezmoi inspiration
