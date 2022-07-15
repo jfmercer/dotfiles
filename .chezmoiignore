@@ -1,6 +1,7 @@
 LICENSE.md
 README.md
 .github/
+asdf/
 bin/
 fzf/
 git/
