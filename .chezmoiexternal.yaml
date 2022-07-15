@@ -47,3 +47,46 @@
     exact: true
     stripComponents: 1
     refreshPeriod: "168h"
+# tmux plugin manager
+".tmux/plugins/tpm":
+    type: "archive"
+    url: "https://github.com/tmux-plugins/tpm/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
+".tmux/plugins/tmux-resurrect":
+    type: "archive"
+    url: "https://github.com/tmux-plugins/tmux-resurrect/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
+".tmux/plugins/tmux-continuum":
+    type: "archive"
+    url: "https://github.com/tmux-plugins/tmux-continuum/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
+".tmux/plugins/tmux-open":
+    type: "archive"
+    url: "https://github.com/tmux-plugins/tmux-open/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
+".tmux/plugins/tmux-copycat":
+    type: "archive"
+    url: "https://github.com/tmux-plugins/tmux-copycat/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
+".tmux/plugins/tmux-yank":
+    type: "archive"
+    url: "https://github.com/tmux-plugins/tmux-yank/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
+".tmux/plugins/jimeh/tmux-themepack":
+    type: "archive"
+    url: "https://github.com/jimeh/tmux-themepack/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
