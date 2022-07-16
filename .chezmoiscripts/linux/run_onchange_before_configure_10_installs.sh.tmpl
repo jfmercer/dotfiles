@@ -1,0 +1,57 @@
+{{- if and (eq .chezmoi.os "linux") .install_linux_apps -}}
+#!/usr/bin/env bash
+
+set -eufo pipefail
+
+# Ask for the administrator password upfront
+sudo -v
+
+# Keep-alive: update existing `sudo` time stamp until linux installs have finished
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+# install linuxbrew dependencies
+sudo apt install -y build-essential
+
+# Install Linuxbrew
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# put brew in $PATH
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+# This install is recommended by the linuxbrew maintainers
+brew install gcc
+
+# bash-completion caused problems for linuxbrew & was removed
+{{ $brews := list
+     "bat"
+     "brew-cask-completion"
+     "cheat"
+     "chezmoi"
+     "ctags"
+     "diff-so-fancy"
+     "exa"
+     "fzf"
+     "gh"
+     "git"
+     "gpg"
+     "grc"
+     "htop"
+     "jq"
+     "nmap"
+     "shellcheck"
+     "ssh-copy-id"
+     "telnet"
+     "tig"
+     "tmux"
+     "trash"
+     "tree"
+     "vim"
+     "wget" }}
+
+brew bundle --no-lock --file=/dev/stdin <<EOF
+{{ range ($brews | sortAlpha | uniq) }}
+brew "{{ . }}"
+{{- end }}
+EOF
+
+{{- end -}}

@@ -1,6 +1,7 @@
 LICENSE.md
 README.md
 .github/
+.vscode/
 asdf/
 bin/
 fzf/
