@@ -10,23 +10,10 @@ on:
 
 jobs:
   build:
-    runs-on: macos-12
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v2
       - run: sh -c scripts/install_dotfiles.sh
-  # test:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       variant: [devcontainer, wsl, gnome]
-  #       os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
-  #       include:
-  #         - variant: devcontainer
-  #           os: alpine
-  #         - variant: devcontainer
-  #           os: debian
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - run: |
-  #         scripts/test.sh --variant "${{ matrix.variant }}" --os "${{ matrix.os }}"

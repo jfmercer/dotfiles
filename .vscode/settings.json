@@ -1,0 +1,27 @@
+{
+    "shellcheck.ignorePatterns": {
+      "**/*.zsh": true,
+      "**/*.zshrc": true,
+      "**/zshrc": true,
+      "**/*.zprofile": true,
+      "**/zprofile": true,
+      "**/*.zlogin": true,
+      "**/zlogin": true,
+      "**/*.zlogout": true,
+      "**/zlogout": true,
+      "**/*.zshenv": true,
+      "**/zshenv": true,
+      "**/*.zsh-theme": true,
+      // custom
+      "**/*_zshrc": true
+    },
+    "files.associations": {
+      "**/scripts/install_*": "shellscript",
+      "*_zshrc": "shellscript",
+      "**/run_*": "shellscript",
+      "*.yaml.tmpl": "helm",
+      ".chezmoi*.yaml": "helm",
+      ".chezmoiignore": "helm",
+      ".chezmoiremove": "helm"
+    }
+  }

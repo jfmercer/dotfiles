@@ -2,11 +2,15 @@
 
 {{- $email := "jfmercer@protonmail.com" -}}
 {{- $install_mac_apps := true -}}
+{{- $install_linux_apps := true -}}
 
 {{- if $interactive -}}
 {{-   $email = promptString "email for .gitconfig" -}}
 {{-   if (eq .chezmoi.os "darwin") -}}
 {{-     $install_mac_apps = eq (promptString "Install Mac applications (y/n)") "y" -}}
+{{-   end -}}
+{{-   if (eq .chezmoi.os "linux") -}}
+{{-     $install_linux_apps = eq (promptString "Install Linux applications (y/n)") "y" -}}
 {{-   end -}}
 {{- end -}}
 
@@ -21,3 +25,4 @@ diff:
 data:
   email: {{ $email | quote }}
   install_mac_apps: {{ $install_mac_apps }}
+  install_linux_apps: {{ $install_linux_apps }}

@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "editorconfig.editorconfig",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "timonwong.shellcheck",
+    "redhat.vscode-yaml"
+  ]
+}

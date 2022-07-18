@@ -1,5 +1,5 @@
 {{- if and (eq .chezmoi.os "darwin") .install_mac_apps -}}
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eufo pipefail
 
@@ -31,17 +31,17 @@ brew tap homebrew/cask-fonts
      "trash"
      "tree"
      "vim"
-     "wget" -}}
+     "wget" }}
 {{ $casks := list
      "firefox"
-     "font-menlo-for-powerline" -}}
+     "font-menlo-for-powerline" }}
 
 brew bundle --no-lock --file=/dev/stdin <<EOF
-{{ range ($brews | sortAlpha | uniq) -}}
+{{ range ($brews | sortAlpha | uniq) }}
 brew "{{ . }}"
-{{ end -}}
-{{ range ($casks | sortAlpha | uniq) -}}
+{{- end }}
+{{ range ($casks | sortAlpha | uniq) }}
 cask "{{ . }}"
-{{ end -}}
+{{- end }}
 EOF
-{{ end -}}
+{{ end }}

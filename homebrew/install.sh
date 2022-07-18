@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Install `brew` in $HOME rather than /usr/local
 git clone https://github.com/Homebrew/brew "$HOME"/homebrew

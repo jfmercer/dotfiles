@@ -7,12 +7,27 @@ You can use the [convenience script](./scripts/install_dotfiles.sh) to install t
 
 `wget`
 ```bash
-sh -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
+/usr/bin/env bash -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
 `curl`:
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
+/usr/bin/env bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
+```
+## Convenience script
+
+The [getting started](#getting-started) step used the [convenience script](./scripts/install_dotfiles.sh) to install this dotfiles. There are some extra options that you can use to tweak the installation if you need.
+
+It supports some environment variables:
+
+- `DOTFILES_REPO_HOST`: Defaults to `https://github.com`.
+- `DOTFILES_USER`: Defaults to `jfmercer`.
+- `DOTFILES_BRANCH`: Defaults to `master`.
+
+For example, you can use it to clone and install the dotfiles repository at the `beta` branch with:
+
+```console
+DOTFILES_BRANCH=foobar /usr/bin/env bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
 ## vim
@@ -48,6 +63,10 @@ A beautiful and very useful vim status line. For this to work properly, you may 
 Adds the monokai color scheme.
 ##### [delimitMate](https://github.com/Raimondi/delimitMate)
 Provides insert mode auto-completion for quotes, parentheses, brackets, etc.
+
+### A Note on Go Templates
+
+Apparently, `{{-` strips leading whitespace, `-}}` strips trailing whitespace, and both `{{` and `}}` do neither.
 
 ## Credits
 
