@@ -7,12 +7,12 @@ You can use the [convenience script](./scripts/install_dotfiles.sh) to install t
 
 `wget`
 ```bash
-/usr/bin/env bash -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
+bash -c "$(wget -qO- https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
 `curl`:
 ```bash
-/usr/bin/env bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 ## Convenience script
 
