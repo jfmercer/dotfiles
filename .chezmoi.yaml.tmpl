@@ -1,8 +1,10 @@
 {{- $interactive := stdinIsATTY -}}
 
 {{- $email := "jfmercer@protonmail.com" -}}
+# These default to true--sign--so that they can be tested in CI.
 {{- $install_mac_apps := true -}}
 {{- $install_linux_apps := true -}}
+{{- $set_git_to_ssh := true -}}
 
 {{- if $interactive -}}
 {{-   $email = promptString "email for .gitconfig" -}}
@@ -12,6 +14,7 @@
 {{-   if (eq .chezmoi.os "linux") -}}
 {{-     $install_linux_apps = eq (promptString "Install Linux applications (y/n)") "y" -}}
 {{-   end -}}
+{{-   $set_git_to_ssh = eq (promptString "Switch git repo from HTTPS to SSH? (y/n)") "y" -}}
 {{- end -}}
 
 verbose: true
@@ -26,3 +29,4 @@ data:
   email: {{ $email | quote }}
   install_mac_apps: {{ $install_mac_apps }}
   install_linux_apps: {{ $install_linux_apps }}
+  set_git_to_ssh: {{ $set_git_to_ssh }}
