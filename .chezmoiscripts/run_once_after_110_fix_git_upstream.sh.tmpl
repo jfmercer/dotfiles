@@ -1,3 +1,4 @@
+{{- if .set_git_to_ssh -}}
 #!/usr/bin/env bash
 
 set -eufo pipefail
@@ -18,4 +19,8 @@ git remote -v
 
 cd - || ( echo "fix_git_upstream could not cd back to original directory!"; exit 1 )
 
+echo "REMINDER: add SSH key and git fetch -a manually"
+
 exit $EXIT_CODE
+
+{{ end }}

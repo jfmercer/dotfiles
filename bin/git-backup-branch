@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+CURRENT_BRANCH=$(git branch --show-current)
+BACKUP_BRANCH=backup-"$CURRENT_BRANCH"
+
+if [ -z "$(git branch --list "$BACKUP_BRANCH")" ]; then
+    git checkout -b backup-"$CURRENT_BRANCH"
+    git checkout -
+else
+    echo "ERROR: backup branch already exists!"
+    exit 1
+fi
