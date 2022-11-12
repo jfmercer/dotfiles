@@ -42,11 +42,19 @@
     excludesfile = ~/.gitignore
     editor = vim
     # the default is 'less -FRSX'
-    pager = diff-so-fancy | less --tabs=4 -RFX
+    pager = delta --diff-so-fancy
 
 [credential]
 #     helper = osxkeychain
 	authority = basic
+
+[delta]
+    navigate = true
+    line-numbers = true
+    side-by-side = true
+
+[diff]
+    colorMoved = default
 
 # Any git pull or git fetch will auto-prune, that is, any local branch whose
 # corresponding remote is gone will be deleted.
@@ -54,11 +62,11 @@
     prune = true
 
 [interactive]
-    diffFilter = diff-so-fancy --patch
+    diffFilter = delta --color-only
+
+[merge]
+    conflictStyle = diff3
 
 [push]
     # This is the default in Git 2.0
     default = simple
-
-[merge]
-    conflictStyle = diff3
