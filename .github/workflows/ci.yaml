@@ -15,5 +15,8 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v2
-      - run: sh -c scripts/install_dotfiles.sh
+      - uses: actions/checkout@v3
+      - name: Echo branch name
+        run: echo "GITHUB_HEAD_REF is $GITHUB_HEAD_REF"
+      - name: Test dotfiles installation
+        run: DOTFILES_BRANCH=$GITHUB_HEAD_REF bash -c scripts/install_dotfiles.sh
