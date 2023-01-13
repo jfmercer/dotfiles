@@ -17,6 +17,11 @@
 {{-   $set_git_to_ssh = eq (promptString "Switch git repo from HTTPS to SSH? (y/n)") "y" -}}
 {{- end -}}
 
+{{- $osid := .chezmoi.os -}}
+{{- if hasKey .chezmoi.osRelease "id" -}}
+{{-   $osid = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
+{{- end -}}
+
 verbose: true
 
 diff:
@@ -30,3 +35,4 @@ data:
   install_mac_apps: {{ $install_mac_apps }}
   install_linux_apps: {{ $install_linux_apps }}
   set_git_to_ssh: {{ $set_git_to_ssh }}
+  osid: {{ $osid | quote }}
