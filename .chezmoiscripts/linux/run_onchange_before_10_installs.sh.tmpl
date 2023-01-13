@@ -42,13 +42,25 @@ brew install gcc
      "nmap"
      "shellcheck"
      "ssh-copy-id"
-     "telnet"
      "tig"
      "tmux"
-     "trash"
      "tree"
      "vim"
      "wget" }}
+
+# Parrot install list
+{{ if eq .osid "linux-parrot" }}
+
+{{ $brews = list
+     "bat"
+     "chezmoi"
+     "ctags"
+     "exa"
+     "fzf"
+     "git-delta"
+     "lazygit" }}
+
+{{ end }}
 
 brew bundle --no-lock --file=/dev/stdin <<EOF
 {{ range ($brews | sortAlpha | uniq) }}
