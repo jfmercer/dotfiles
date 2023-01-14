@@ -10,7 +10,8 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 sudo -n apt install -y build-essential
 
 # Install Linuxbrew
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# HOMEBREW_INSTALL_FROM_API=1: this flag is in beta and should speed up installation
+HOMEBREW_INSTALL_FROM_API=1 NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # put brew in $PATH
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"

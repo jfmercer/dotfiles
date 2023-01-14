@@ -1,7 +1,14 @@
 {{- if and (eq .chezmoi.os "darwin" "linux") -}}
 #!/usr/bin/env bash
-
 set -eufo pipefail
+
+{{ if eq .chezmoi.os "linux" }}
+
+# sometimes automated linux installs lose track of linuxbrew's vim
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+{{ end }}
+
 vim -c PlugUpdate -c qa
 
 {{- end -}}
