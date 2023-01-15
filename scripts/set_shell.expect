@@ -1,0 +1,8 @@
+#!/usr/bin/env expect
+
+set PASS [lindex $argv 0]
+set timeout 1
+spawn chsh -s /usr/bin/zsh
+expect "Password: "
+send -- "$PASS\r"
+expect eof

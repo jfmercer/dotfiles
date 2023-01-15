@@ -68,3 +68,6 @@ alias psql="docker run --rm -it --net=host postgres:12.1 psql"
 
 # chezmoi
 alias cm=chezmoi
+
+# arsenal
+alias a=arsenal

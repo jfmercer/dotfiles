@@ -22,6 +22,7 @@
       "*.yaml.tmpl": "helm",
       ".chezmoi*.yaml": "helm",
       ".chezmoiignore": "helm",
-      ".chezmoiremove": "helm"
+      ".chezmoiremove": "helm",
+      ".expect": "shellscript"
     }
   }
