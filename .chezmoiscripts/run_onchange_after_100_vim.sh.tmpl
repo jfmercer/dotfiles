@@ -9,6 +9,8 @@ eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 {{ end }}
 
-vim -T xterm-256color -c PlugUpdate -c qa
+if command -v brew > /dev/null; then
+  "$(brew --prefix)/bin/vim" -T xterm-256color -c PlugUpdate -c qa
+fi
 
 {{- end -}}
