@@ -19,7 +19,7 @@ echo "DEBUG: brew prefix is $(brew --prefix)"
 if command -v brew > /dev/null; then
   echo "DEBUG: Now installing vim plugins"
   echo "DEBUG: now running $(brew --prefix)/bin/vim  -T xterm-256color -c PlugUpdate -c qa"
-  "$(brew --prefix)/bin/vim" -T xterm-256color -c PlugUpdate -c qa
+  "$(brew --prefix)/bin/vim" -T "xterm-256color" -c "PlugUpdate" -c "qa"
 fi
 
 {{- end -}}
