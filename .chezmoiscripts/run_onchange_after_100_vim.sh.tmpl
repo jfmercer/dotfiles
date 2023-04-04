@@ -6,6 +6,10 @@ echo "DEBUG: starting vim plugin install script"
 
 {{ if eq .chezmoi.os "linux" }}
 
+echo "DEBUG: Set DEBIAN_FRONTEND to noninteractive"
+export DEBIAN_FRONTEND=noninteractive
+echo "DEBUG: DEBIAN_FRONTEND equals $DEBIAN_FRONTEND"
+
 # sometimes automated linux installs lose track of linuxbrew's vim
 echo "DEBUG: Now putting linuxbrew in PATH"
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
@@ -18,8 +22,7 @@ echo "DEBUG: brew prefix is $(brew --prefix)"
 
 if command -v brew > /dev/null; then
   echo "DEBUG: Now installing vim plugins"
-  echo "DEBUG: now running $(brew --prefix)/bin/vim  -T xterm-256color -c PlugUpdate -c qa"
-  "$(brew --prefix)/bin/vim" -T "xterm-256color" -c "PlugUpdate" -c "qa"
+  "$(brew --prefix)/bin/vim" -es -u "$HOME"/.vimrc -i NONE -c "PlugUpdate --sync" -c "qa"
 fi
 
 {{- end -}}
