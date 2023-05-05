@@ -39,9 +39,9 @@ alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
 # IP addresses
-alias ip="dig @resolver4.opendns.com myip.opendns.com +short"
-alias ip4="dig @resolver4.opendns.com myip.opendns.com +short -4"
-alias ip6="dig @resolver1.ipv6-sandbox.opendns.com AAAA myip.opendns.com +short -6"
+alias myip="dig @resolver4.opendns.com myip.opendns.com +short"
+alias myip4="dig @resolver4.opendns.com myip.opendns.com +short -4"
+alias myip6="dig @resolver1.ipv6-sandbox.opendns.com AAAA myip.opendns.com +short -6"
 alias localip="ipconfig getifaddr en0"
 alias ips="ifconfig -a | grep -o 'inet6\? \(\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)\|[a-fA-F0-9:]\+\)' | sed -e 's/inet6* //'"
 
