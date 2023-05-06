@@ -30,6 +30,16 @@ For example, you can use it to clone and install the dotfiles repository at the 
 DOTFILES_BRANCH=foobar /usr/bin/env bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
+## Troubleshooting
+
+### Debug Installation
+Add `DOTFILES_DEBUG=true` to get debug output during the installation.
+
+### Linux and Homebrew
+For my Linux/Homebrew install script to work, the user running the dotfiles installation must be able to use `sudo` without a password. That is, the `sudoers` file should have this line:
+
+`username ALL=(ALL) NOPASSWD: ALL`
+
 ## vim
 #### Key Mappings
 
