@@ -4,7 +4,7 @@ alias ls="command exa"
 alias lsd="ls -lFD"
 
 # List all files colorized in long format
-alias l="ls -lF ${colorflag}"
+alias l="ls -lgF ${colorflag}"
 # List all files colorized in long format, including dot files
-alias la="ls -laF ${colorflag}"
+alias la="ls -lagF ${colorflag}"
 
