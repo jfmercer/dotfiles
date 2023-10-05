@@ -1,5 +1,5 @@
-# Always use exa, the better ls
-alias ls="command exa --color=always"
+# Always use eza, the better ls
+alias ls="command eza --color=always"
 # List only directories
 alias lsd="ls -lFD"
 
