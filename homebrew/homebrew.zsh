@@ -11,5 +11,5 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     . $HOME/.asdf/asdf.sh
 # standard macOS install
 else
-    eval "$(/usr/local/bin/brew shellenv)"
+    eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
