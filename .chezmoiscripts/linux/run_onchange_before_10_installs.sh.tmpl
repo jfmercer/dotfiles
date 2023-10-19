@@ -3,71 +3,71 @@
 
 set -eufo pipefail
 
+# if shell is interactive, prompt for sudo
+if [[ $- == *i* ]]; then
+  sudo -v
+fi
+
 # Keep-alive: update existing `sudo` time stamp until linux installs have finished
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
-# install linuxbrew dependencies
-sudo -n apt install -y build-essential
+sudo apt update
 
-# Install Linuxbrew
-# HOMEBREW_INSTALL_FROM_API=1: this flag is in beta and should speed up installation
-HOMEBREW_INSTALL_FROM_API=1 NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+packages=(
+    "bat"
+    "fzf"
+    "gh"
+    "git"
+    "gpg"
+    "grc"
+    "htop"
+    "jq"
+    "less"
+    "nmap"
+    "shellcheck"
+    "tig"
+    "tldr"
+    "tmux"
+    "tree"
+    "universal-ctags"
+    "vim"
+    "wget"
+)
 
-# put brew in $PATH
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# Loop through the array and install each package
+for package in "${packages[@]}"; do
+    echo "Installing $package..."
+    sudo apt install -y $package
+done
 
-# This install is recommended by the linuxbrew maintainers
-brew install gcc
+# # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
+if [ ! -d /etc/apt/keyrings ]; then
+    sudo mkdir -p /etc/apt/keyrings
+fi
+wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+sudo apt update
+sudo apt install -y eza
 
-# bash-completion caused problems for linuxbrew & was removed
-{{ $brews := list
-     "bat"
-     "brew-cask-completion"
-     "cheat"
-     "chezmoi"
-     "ctags"
-     "eza"
-     "fzf"
-     "gh"
-     "git"
-     "git-delta"
-     "gpg"
-     "grc"
-     "htop"
-     "jq"
-     "lazygit"
-     "less"
-     "nmap"
-     "shellcheck"
-     "ssh-copy-id"
-     "tig"
-     "tmux"
-     "tree"
-     "vim"
-     "wget" }}
+# # noninteractive rust install (needed for delta)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+# install delta
+cargo install git-delta
+
+# # install lazygit
+LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+tar xf lazygit.tar.gz lazygit
+sudo install lazygit /usr/local/bin
+rm -rf "$HOME"/lazygit*
 
 # Parrot install list
 {{ if eq .osid "linux-parrot" }}
 
-{{ $brews = list
-     "bat"
-     "chezmoi"
-     "ctags"
-     "eza"
-     "expect"
-     "fzf"
-     "git-delta"
-     "grc"
-     "lazygit"
-     "tmux" 
-     "vim" }}
+sudo apt -y install expect
 
 {{ end }}
-
-brew bundle --no-lock --file=/dev/stdin <<EOF
-{{ range ($brews | sortAlpha | uniq) }}
-brew "{{ . }}"
-{{- end }}
-EOF
 
 {{- end -}}
