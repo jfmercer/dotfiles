@@ -18,7 +18,7 @@ autocmd VimEnter * if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
 \| endif
 
 " ================ Load vim plugins ===================================
-call plug#begin()
+call plug#begin('~/.vim/plugged')
 
 Plug 'majutsushi/tagbar'
 Plug 'Lokaltog/vim-easymotion'
@@ -224,15 +224,6 @@ nnoremap <C-h> <C-w>h
 nnoremap <C-j> <C-w>j
 nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
-" ================  Abbreviations ================================
-
-" These work in Insert Mode and are just like TextExpander Snippets.
-
-augroup abbreviations
-    autocmd!
-    autocmd FileType * :inoreabbrev eml john.f.mercer@gmail.com
-    autocmd FileType * :inoreabbrev weml john@radify.io
-augroup END
 
 " ================ Window Settings  ==============================
 

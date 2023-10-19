@@ -35,11 +35,6 @@ DOTFILES_BRANCH=foobar /usr/bin/env bash -c "$(curl -fsSL https://raw.githubuser
 ### Debug Installation
 Add `DOTFILES_DEBUG=true` to get debug output during the installation.
 
-### Linux and Homebrew
-For my Linux/Homebrew install script to work, the user running the dotfiles installation must be able to use `sudo` without a password. That is, the `sudoers` file should have this line:
-
-`username ALL=(ALL) NOPASSWD: ALL`
-
 ## vim
 #### Key Mappings
 

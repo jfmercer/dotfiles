@@ -2,27 +2,12 @@
 #!/usr/bin/env bash
 set -eufo pipefail
 
-echo "DEBUG: starting vim plugin install script"
+# Install vim-plug (https://github.com/junegunn/vim-plug/wiki/tutorial#setting-up)
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 
-{{ if eq .chezmoi.os "linux" }}
-
-echo "DEBUG: Set DEBIAN_FRONTEND to noninteractive"
-export DEBIAN_FRONTEND=noninteractive
-echo "DEBUG: DEBIAN_FRONTEND equals $DEBIAN_FRONTEND"
-
-# sometimes automated linux installs lose track of linuxbrew's vim
-echo "DEBUG: Now putting linuxbrew in PATH"
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-
-{{ end }}
-
-echo "DEBUG: brew is in $(which brew)"
-echo "DEBUG: vim is in $(which vim)"
-echo "DEBUG: brew prefix is $(brew --prefix)"
-
-if command -v brew > /dev/null; then
-  echo "DEBUG: Now installing vim plugins"
-  "$(brew --prefix)/bin/vim" -es -u "$HOME"/.vimrc -i NONE -c "PlugUpdate --sync" -c "qa"
-fi
+# NOTE: plugin install fails on pwnbox, and not even the gods know why
+# See https://github.com/junegunn/vim-plug/wiki/tips#install-plugins-on-the-command-line
+vim -es -u "$HOME/.vimrc" -i NONE -c "PlugInstall --sync" -c "qa"
 
 {{- end -}}
