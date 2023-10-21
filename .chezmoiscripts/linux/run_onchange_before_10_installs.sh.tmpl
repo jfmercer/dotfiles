@@ -56,9 +56,13 @@ source "$HOME/.cargo/env"
 # install delta
 cargo install git-delta
 
-# # install lazygit
+# install lazygit
 LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+if [[ $(arch) == "x86_64" ]]; then
+  curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+else
+  curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz"
+fi
 tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
 rm -rf "$HOME"/lazygit*
@@ -69,5 +73,17 @@ rm -rf "$HOME"/lazygit*
 sudo apt -y install expect
 
 {{ end }}
+
+# Remove packages
+packages=("nano")
+
+for pkg in "${packages[@]}"; do
+    # Check if package is installed
+    if command -v "$pkg" >/dev/null 2>&1; then
+        echo "$pkg is installed. Removing it now."
+        sudo apt remove -y "$pkg"
+    fi
+done
+
 
 {{- end -}}
