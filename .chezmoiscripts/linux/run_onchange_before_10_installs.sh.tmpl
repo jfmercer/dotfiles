@@ -15,6 +15,7 @@ sudo apt update
 
 packages=(
     "bat"
+    "expect" # needed to set shell on Parrot
     "fzf"
     "gh"
     "git"
@@ -33,6 +34,17 @@ packages=(
     "vim"
     "wget"
 )
+
+# security only packages
+# this separate list helps with Github CI to pass
+{{ if or (eq .osid "linux-kali") (eq .osid "linux-parrot") }}
+
+sec_packages=(
+    "seclists"
+)
+packages+=("${sec_packages[@]}")
+
+{{ end }}
 
 # Loop through the array and install each package
 for package in "${packages[@]}"; do
@@ -67,17 +79,10 @@ tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
 rm -rf "$HOME"/lazygit*
 
-# Parrot install list
-{{ if eq .osid "linux-parrot" }}
-
-sudo apt -y install expect
-
-{{ end }}
-
 # Remove packages
-packages=("nano")
+rm_packages=("nano")
 
-for pkg in "${packages[@]}"; do
+for pkg in "${rm_packages[@]}"; do
     # Check if package is installed
     if command -v "$pkg" >/dev/null 2>&1; then
         echo "$pkg is installed. Removing it now."
