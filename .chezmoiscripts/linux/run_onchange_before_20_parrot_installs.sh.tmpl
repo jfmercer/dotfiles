@@ -17,12 +17,6 @@ python3 -m pip install --no-input arsenal-cli
 # Load default MATE terminal settings
 dbus-launch dconf load /org/mate/terminal/ < $DOTFILES/terminal/MATE.terminal
 
-# Linux specific aliases
-cat <<EOF > $DOTFILES/system/linux.zsh
-alias pbcopy='xclip -selection clipboard'
-alias pbpaste='xclip -selection clipboard -o'
-EOF
-
 # Replace nvim with real vim
 sudo update-alternatives --remove vim /usr/bin/nvim
 sudo apt install -y vim
