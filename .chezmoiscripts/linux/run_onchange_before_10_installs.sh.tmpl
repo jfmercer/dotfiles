@@ -15,6 +15,7 @@ sudo apt update
 
 packages=(
     "bat"
+    "colordiff"
     "expect" # needed to set shell on Parrot
     "fzf"
     "gh"
@@ -33,6 +34,7 @@ packages=(
     "universal-ctags"
     "vim"
     "wget"
+    "xclip"
 )
 
 # security only packages
@@ -40,6 +42,8 @@ packages=(
 {{ if or (eq .osid "linux-kali") (eq .osid "linux-parrot") }}
 
 sec_packages=(
+    "burpsuite"
+    "gobuster"
     "seclists"
 )
 packages+=("${sec_packages[@]}")
@@ -89,6 +93,5 @@ for pkg in "${rm_packages[@]}"; do
         sudo apt remove -y "$pkg"
     fi
 done
-
 
 {{- end -}}

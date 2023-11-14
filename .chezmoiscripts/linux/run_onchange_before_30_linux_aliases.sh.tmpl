@@ -1,0 +1,15 @@
+{{- if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+
+set -eufo pipefail
+
+DOTFILES="$HOME/.local/share/chezmoi"
+
+# Append aliases to linux.zsh
+cat <<EOF >> "$DOTFILES/system/linux.zsh"
+alias pbcopy='xclip -selection clipboard'
+alias pbpaste='xclip -selection clipboard -o'
+alias bat='batcat'
+EOF
+
+{{- end -}}
