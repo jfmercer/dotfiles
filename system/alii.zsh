@@ -9,7 +9,6 @@ alias ~="cd ~" # `cd` is probably faster to type though
 alias -- -="cd -"
 
 # Shortcuts
-alias D="cd ~/Dropbox"
 alias C="cd ~/Code"
 alias c="code ."
 alias dl="cd ~/Downloads"
