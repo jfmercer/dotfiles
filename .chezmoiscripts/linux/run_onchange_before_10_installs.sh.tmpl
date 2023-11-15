@@ -16,6 +16,7 @@ sudo apt update
 packages=(
     "bat"
     "colordiff"
+    "direnv"
     "expect" # needed to set shell on Parrot
     "fzf"
     "gh"
@@ -81,7 +82,7 @@ else
 fi
 tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
-rm -rf "$HOME"/lazygit*
+sudo rm -rf "$HOME"/lazygit*
 
 # Remove packages
 rm_packages=("nano")
