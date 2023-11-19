@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Setup local dir with LHOST and RHOST
+
+if ! ifconfig tun0 &> /dev/null; then
+    echo "ERROR: Please connect to the VPN"
+    exit 1
+fi
+
+if [ -f ".envrc" ]; then
+    rm .envrc
+fi
+touch .envrc
+
+LHOST=$(ifconfig tun0 | grep 'inet ' | awk '{print $2}')
+echo "export LHOST=$LHOST" >> .envrc
+
+read -p "Enter last two octals of the remote IP address: " REMOTE_IP
+echo "export RHOST=192.168.$REMOTE_IP" >> .envrc
+
+direnv allow
