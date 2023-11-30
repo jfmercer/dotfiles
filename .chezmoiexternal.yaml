@@ -5,6 +5,13 @@
     exact: true
     stripComponents: 1
     refreshPeriod: "168h"
+# fzf
+".fzf":
+    type: "archive"
+    url: "https://github.com/junegunn/fzf/archive/master.tar.gz"
+    exact: true
+    stripComponents: 1
+    refreshPeriod: "168h"
 # vim plugin manager
 ".vim/autoload/plug.vim":
     type: "file"

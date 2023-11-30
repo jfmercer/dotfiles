@@ -18,7 +18,7 @@ packages=(
     "colordiff"
     "direnv"
     "expect" # needed to set shell on Parrot
-    "fzf"
+    "fd-find"
     "gh"
     "git"
     "gpg"
@@ -38,12 +38,12 @@ packages=(
     "xclip"
 )
 
-# security only packages
+# security only packages - kali only
 # this separate list helps with Github CI to pass
-{{ if or (eq .osid "linux-kali") (eq .osid "linux-parrot") }}
+# not doing this on parrot because all it does is complain
+{{ if eq .osid "linux-kali" }}
 
 sec_packages=(
-    "burpsuite"
     "gobuster"
     "seclists"
 )

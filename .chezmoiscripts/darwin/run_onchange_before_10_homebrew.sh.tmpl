@@ -11,10 +11,11 @@ brew tap homebrew/cask-fonts
      "brew-cask-completion"
      "cheat"
      "chezmoi"
+     "colordiff"
      "ctags"
      "dockutil"
      "eza"
-     "fzf"
+     "fd"
      "gh"
      "git"
      "git-delta"
@@ -46,4 +47,8 @@ brew "{{ . }}"
 cask "{{ . }}"
 {{- end }}
 EOF
+
+# Complete fzf installation
+$(brew --prefix)/opt/fzf/install --key-bindings --completion --no-update-rc
+
 {{ end }}
