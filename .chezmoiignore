@@ -11,6 +11,7 @@ homebrew/
 iterm2/
 macos/
 node/
+rust/
 scripts/
 system/
 terminal/
