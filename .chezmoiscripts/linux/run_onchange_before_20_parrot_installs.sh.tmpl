@@ -12,7 +12,8 @@ git clone https://github.com/lxbrtsch/Menlo-for-Powerline.git ~/.fonts
 fc-cache -vf ~/.fonts
 
 # Install arsenal
-python3 -m pip install --no-input arsenal-cli
+# NOTE: currently trying navi instead of arsenal
+# python3 -m pip install --no-input arsenal-cli
 
 # Load default MATE terminal settings
 dbus-launch dconf load /org/mate/terminal/ < $DOTFILES/terminal/MATE.terminal
