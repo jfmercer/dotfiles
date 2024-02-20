@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Checkout default branch
+# This assumes that either `master` or `main` is the default
+
+if git show-ref --quiet refs/heads/master; then
+    git checkout master
+elif git show-ref --quiet refs/heads/main; then
+    git checkout main
+else
+    echo "Neither 'master' nor 'main' branch exists."
+fi
