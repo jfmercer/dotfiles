@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+if [ -d "$HOME/Applications/PyCharm.app" ]; then
+    open -na "$HOME/Applications/PyCharm.app" --args "$@"
+elif [ -d "/Applications/PyCharm.app" ]; then
+    open -na "/Applications/PyCharm.app" --args "$@"
+else
+    echo "PyCharm cannot be found."
+fi
