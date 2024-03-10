@@ -28,7 +28,7 @@ $Bytes = [System.Text.Encoding]::Unicode.GetBytes($Text)
 
 $EncodedText =[Convert]::ToBase64String($Bytes)
 
-$EncodedText
+## $EncodedText
 
 # Output the constructed string (for verification or debugging)
 Write-Host $EncodedText
