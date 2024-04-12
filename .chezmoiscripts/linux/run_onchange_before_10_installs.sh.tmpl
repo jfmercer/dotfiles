@@ -44,8 +44,10 @@ packages=(
 {{ if eq .osid "linux-kali" }}
 
 sec_packages=(
+    "box64"
     "hurl"
     "gobuster"
+    "peass"
     "seclists"
 )
 packages+=("${sec_packages[@]}")
