@@ -1,5 +1,5 @@
 # OS X has no `md5sum`, so use `md5` as a fallback
-alias md5sum="md5"
+alias mac5sum="md5"
 
 # Trim new lines and copy to clipboard
 alias cc="tr -d '\n' | pbcopy"
