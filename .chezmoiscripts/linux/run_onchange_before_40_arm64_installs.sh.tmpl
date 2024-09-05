@@ -1,0 +1,25 @@
+{{- if and (eq .chezmoi.os "linux") (eq .chezmoi.arch "arm64") -}}
+#!/usr/bin/env bash
+set -eufo pipefail
+
+# if shell is interactive, prompt for sudo
+if [[ $- == *i* ]]; then
+  sudo -v
+fi
+
+# Keep-alive: update existing `sudo` time stamp until linux installs have finished
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+sudo apt update
+
+arm64_packages=(
+    "box64"
+)
+
+# Loop through the array and install each package
+for arm64_package in "${arm64_packages[@]}"; do
+    echo "Installing $arm64_package..."
+    sudo apt install -y $arm64_package
+done
+
+{{- end -}}
