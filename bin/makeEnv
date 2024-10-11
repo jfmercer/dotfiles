@@ -2,20 +2,106 @@
 #
 # Setup local dir with LHOST and RHOST
 
-if ! ifconfig tun0 &> /dev/null; then
-    echo "ERROR: Please connect to the VPN"
+# Enable strict mode for safer scripting
+set -euo pipefail
+IFS=$'\n\t'
+
+# Exit with a specific error code and message
+exit_with_error() {
+    echo "ERROR: $1"
     exit 1
-fi
+}
 
-if [ -f ".envrc" ]; then
-    rm .envrc
-fi
-touch .envrc
+# Function to check VPN connection using 'ip' command
+check_vpn() {
+    if ! ip addr show tun0 &> /dev/null; then
+        exit_with_error "Please connect to the VPN"
+    fi
+}
 
-LHOST=$(ifconfig tun0 | grep 'inet ' | awk '{print $2}')
-echo "export LHOST=$LHOST" >> .envrc
+# Function to get LHOST IP address
+get_lhost() {
+    LHOST=$(ip -4 addr show tun0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    printf "export LHOST=\"%s\"\n" "$LHOST" >> .envrc
+    echo "LHOST is set to $LHOST"
+}
 
-read -p "Enter last two octals of the remote IP address: " REMOTE_IP
-echo "export RHOST=192.168.$REMOTE_IP" >> .envrc
+# Function to determine RHOST prefix and number of octets to prompt
+determine_rhost_prefix() {
+    FIRST_OCTET=$(echo "$LHOST" | cut -d '.' -f 1)
+    SECOND_OCTET=$(echo "$LHOST" | cut -d '.' -f 2)
 
-direnv allow
+    if [ "$FIRST_OCTET" == "192" ] && [ "$SECOND_OCTET" == "168" ]; then
+        RHOST_PREFIX="192.168."
+        OCTETS_TO_PROMPT=2
+    elif [ "$FIRST_OCTET" == "10" ]; then
+        RHOST_PREFIX="10."
+        OCTETS_TO_PROMPT=3
+    elif [ "$FIRST_OCTET" == "172" ] && [ "$SECOND_OCTET" -ge 16 ] && [ "$SECOND_OCTET" -le 31 ]; then
+        RHOST_PREFIX="172."
+        OCTETS_TO_PROMPT=3
+    else
+        exit_with_error "LHOST ($LHOST) is not in a recognized private network range"
+    fi
+}
+
+# Function to validate IP octets entered by the user
+validate_octets() {
+    local octets="$1"
+    local expected_count="$2"
+    IFS='.' read -ra ADDR <<< "$octets"
+
+    if [ "${#ADDR[@]}" -ne "$expected_count" ]; then
+        return 1
+    fi
+
+    for octet in "${ADDR[@]}"; do
+        if ! [[ "$octet" =~ ^[0-9]+$ ]] || [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+# Function to prompt the user for RHOST and validate input
+prompt_for_rhost() {
+    while true; do
+        if [ "$OCTETS_TO_PROMPT" -eq 2 ]; then
+            read -r -p "Enter the last two octets of the remote IP address (e.g., x.x): " REMOTE_IP
+        elif [ "$OCTETS_TO_PROMPT" -eq 3 ]; then
+            read -r -p "Enter the last three octets of the remote IP address (e.g., x.x.x): " REMOTE_IP
+        fi
+
+        if validate_octets "$REMOTE_IP" "$OCTETS_TO_PROMPT"; then
+            break
+        else
+            echo "Invalid input. Please enter $OCTETS_TO_PROMPT octet(s) separated by dots, each between 0 and 255."
+        fi
+    done
+
+    # Construct the full RHOST IP address
+    RHOST="${RHOST_PREFIX}${REMOTE_IP}"
+    printf "export RHOST=\"%s\"\n" "$RHOST" >> .envrc
+    echo "RHOST is set to $RHOST"
+}
+
+# Main function to run the script
+main() {
+    check_vpn
+
+    if [ -f ".envrc" ]; then
+        rm .envrc
+    fi
+    touch .envrc
+
+    get_lhost
+    determine_rhost_prefix
+    prompt_for_rhost
+
+    echo "Environment variables have been updated in .envrc"
+
+    direnv allow
+}
+
+main
