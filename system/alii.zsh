@@ -69,6 +69,3 @@ alias a=arsenal
 
 # colorize less
 alias less="less -R"
-
-# rustscan via podman
-alias rustscan='podman run -it --rm --name rustscan rustscan/rustscan:latest'
