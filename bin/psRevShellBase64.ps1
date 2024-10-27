@@ -48,4 +48,4 @@ Write-Host "Encoded string is: "
 Write-Host $EncodedText
 
 Write-Host "String copied to clipboard"
-Invoke-Expression "echo -n '$EncodedText' | tr -d '\n' | pbcopy"
+Invoke-Expression "echo -n '$EncodedText' | tr -d '\n' | xclip -selection clipboard"
