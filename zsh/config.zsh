@@ -25,6 +25,7 @@ setopt HIST_FIND_NO_DUPS # When searching history don't display results already 
 setopt HIST_REDUCE_BLANKS # Remove extra blanks from each command line being added to history
 setopt HIST_VERIFY # don't execute, just expand history
 setopt SHARE_HISTORY # imports new commands and appends typed commands to history
+setopt NO_BANG_HIST # Don't hijack the `!` character for history commands.
 
 # ===== Completion
 setopt COMPLETE_IN_WORD # Allow completion from within a word/phrase
