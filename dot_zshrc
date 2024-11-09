@@ -60,6 +60,6 @@ stty -ixon -ixoff
 
 # fzf fuzzy finder
 # this goes last, I think
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+# [ -f "$DOTFILES"/fzf/fzf.zsh ] && source "$DOTFILES"/fzf/fzf.zsh
 
 # zprof
