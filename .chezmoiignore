@@ -3,6 +3,7 @@ README.md
 .github/
 .vscode/
 asdf/
+atuin/
 bin/
 fzf/
 git/
