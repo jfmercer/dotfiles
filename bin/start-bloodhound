@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+# https://support.bloodhoundenterprise.io/hc/en-us/articles/17468450058267-Install-BloodHound-Community-Edition-with-Docker-Compose#h_01H9MMW93SJA2X2JGWCPNJ71RN
+curl -L https://ghst.ly/getbhce | docker-compose -f - up
