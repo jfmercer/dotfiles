@@ -14,7 +14,6 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 sudo apt update
 
 packages=(
-    "atuin"
     "bat"
     "colordiff"
     "direnv"
@@ -46,6 +45,7 @@ packages=(
 {{ if eq .osid "linux-kali" }}
 
 sec_packages=(
+    "atuin"
     "bloodhound"
     "chisel"
     "cloud-enum"
