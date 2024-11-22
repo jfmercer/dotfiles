@@ -28,6 +28,7 @@ packages=(
     "jq"
     "less"
     "nmap"
+    "pipx"
     "shellcheck"
     "tig"
     "tldr"
@@ -73,6 +74,20 @@ packages+=("${sec_packages[@]}")
 for package in "${packages[@]}"; do
     echo "Installing $package..."
     sudo apt install -y $package
+done
+
+# Install pipx packages
+pipx_packages=(
+  "git+https://github.com/brightio/penelope.git"
+  "git+https://github.com/Tib3rius/AutoRecon.git"
+  "git+https://github.com/Densaugeo/uploadserver.git"
+  "poetry"
+  "updog"
+)
+
+for pipx_packages in "${pipx_packages[@]}"; do
+  echo "Installing pipx package $pipx_package"
+  pipx install $pipx_package
 done
 
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
