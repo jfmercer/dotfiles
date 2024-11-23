@@ -65,7 +65,7 @@ alias fs="stat -c \"%s bytes\""
 alias cm=chezmoi
 
 # arsenal
-alias a=arsenal
+# alias a=arsenal
 
 # colorize less
 alias less="less -R"
