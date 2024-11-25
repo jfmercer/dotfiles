@@ -43,6 +43,14 @@ for file in ${${config_files:#*/path.zsh}:#*/exports.zsh}; do
   source "$file"
 done
 
+# keybinds for zsh-autosuggestion plugih
+# Cf. https://github.com/zsh-users/zsh-autosuggestions/?tab=readme-ov-file#key-bindings
+# bind control + space to accept the suggestion
+# this saves round trips to the right arrow (or END) keys
+bindkey '^ ' autosuggest-accept
+# Currently not bound: accept and execute autosuggestion
+# bindkey 'KEYBINDING' autosuggest-execute
+
 # initialize autocomplete here, otherwise functions won't be loaded
 autoload -Uz compinit
 compinit
