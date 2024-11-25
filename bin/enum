@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+if [ -z "$RHOST" ]; then
+  echo "Error: \$RHOST is not set. Please set the target host using 'export RHOST=<target>'." >&2
+  exit 1
+fi
+
+echo "\$RHOST is set to: $RHOST"
+
+echo "nmap: fast scanning top 1000 TCP ports"
+sudo nmap -v -sS -Pn -n --top-ports 1000 -oA top-1000 "$RHOST"
+
+echo "creating TCP open port list"
+sudo nmap -p- --min-rate=1000 -T4 "$RHOST" | grep '^[0-9]' | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$// > open_ports.txt
+
+echo "nmap: slow scanning open TCP ports"
+sudo nmap -v -p "$(cat open_ports.txt)" -A -oA all-tcp "$RHOST"
