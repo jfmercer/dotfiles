@@ -15,3 +15,6 @@ sudo nmap -p- --min-rate=1000 -T4 "$RHOST" | grep '^[0-9]' | cut -d '/' -f 1 | t
 
 echo "nmap: slow scanning open TCP ports"
 sudo nmap -v -p "$(cat open_ports.txt)" -A -oA all-tcp "$RHOST"
+
+echo "nmap: scanning top 100 UDP ports"
+sudo nmap -v -sU --top-ports 100 -oN udp-top-100.nmap "$RHOST"
