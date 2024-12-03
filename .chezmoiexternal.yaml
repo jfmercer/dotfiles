@@ -84,9 +84,15 @@
     exact: true
     stripComponents: 1
     refreshPeriod: "168h"
-".tmux/plugins/tmux-themepack":
+".tmux/plugins/tmux-powerline":
     type: "archive"
-    url: "https://github.com/jimeh/tmux-themepack/archive/master.tar.gz"
+    url: "https://github.com/erikw/tmux-powerline/archive/master.tar.gz"
     exact: true
     stripComponents: 1
     refreshPeriod: "168h"
+# ".tmux/plugins/tmux-themepack":
+#     type: "archive"
+#     url: "https://github.com/jimeh/tmux-themepack/archive/master.tar.gz"
+#     exact: true
+#     stripComponents: 1
+#     refreshPeriod: "168h"
