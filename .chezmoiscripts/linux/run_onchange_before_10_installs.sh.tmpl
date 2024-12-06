@@ -77,6 +77,8 @@ for package in "${packages[@]}"; do
     sudo apt install -y $package
 done
 
+{{ if eq .osid "linux-kali" }}
+
 # Install pipx packages
 pipx_packages=(
   "git+https://github.com/brightio/penelope.git"
@@ -90,6 +92,8 @@ for pipx_packages in "${pipx_packages[@]}"; do
   echo "Installing pipx package $pipx_package"
   pipx install $pipx_package
 done
+
+{{ end }}
 
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
 if [ ! -d /etc/apt/keyrings ]; then
