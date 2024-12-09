@@ -98,10 +98,10 @@ pipx_packages=(
   "poetry"
 )
 
-# for pipx_packages in "${pipx_packages[@]}"; do
-#   echo "Installing pipx package $pipx_package"
-#   pipx install $pipx_package
-# done
+for pipx_package in "${pipx_packages[@]}"; do
+  echo "Installing pipx package $pipx_package"
+  pipx install $pipx_package
+done
 
 {{ end }}
 
