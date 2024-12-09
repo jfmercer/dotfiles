@@ -95,18 +95,24 @@ done
 {{ if eq .osid "linux-kali" }}
 
 # Install pipx packages
+# NOTE: installing as root might mess this up
 pipx_packages=(
-  "git+https://github.com/brightio/penelope.git"
-  "git+https://github.com/Tib3rius/AutoRecon.git"
-  "git+https://github.com/Densaugeo/uploadserver.git"
-  "git+https://github.com/arthaud/git-dumper.git"
-  "poetry"
+    "git+https://github.com/brightio/penelope.git"
+    "git+https://github.com/Tib3rius/AutoRecon.git"
+    "git+https://github.com/Densaugeo/uploadserver.git"
+    "git+https://github.com/arthaud/git-dumper.git"
+    "poetry"
 )
 
 for pipx_package in "${pipx_packages[@]}"; do
-  echo "Installing pipx package $pipx_package"
-  pipx install $pipx_package
+    echo "Installing pipx package $pipx_package"
+    pipx install $pipx_package
 done
+
+if [ -f /usr/share/wordlists/rockyou.gz ]; then
+    echo "Unzipping rockyou wordlist"
+    gzip -d /usr/share/wordlists/rockyou.gz
+fi
 
 {{ end }}
 
