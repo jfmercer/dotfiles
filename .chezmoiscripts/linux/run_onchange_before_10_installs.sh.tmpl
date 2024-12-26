@@ -31,6 +31,7 @@ packages=(
     "pipx"
     "shellcheck"
     "tig"
+    "tigervnc-viewer"
     "tldr"
     "tmux"
     "tree"
@@ -113,6 +114,11 @@ done
 if [ -f /usr/share/wordlists/rockyou.gz ]; then
     echo "Unzipping rockyou wordlist"
     gzip -d /usr/share/wordlists/rockyou.gz
+fi
+
+if [ -d /home/kali/.local/bin/ ]; then
+    echo "Installing windapsearch"
+    wget "https://github.com/ropnop/go-windapsearch/releases/download/v0.3.0/windapsearch-linux-amd64" -O /home/kali/.local/bin/windapsearch
 fi
 
 {{ end }}
