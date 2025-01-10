@@ -15,6 +15,9 @@ sudo nmap -p- --min-rate=1000 -T4 "$RHOST" | grep '^[0-9]' | cut -d '/' -f 1 | t
 
 sed -i 's/,/, /g' open_ports.txt
 
+echo "All open TCP ports:"
+cat open_ports.txt
+
 echo "nmap: slow scanning open TCP ports"
 sudo nmap -v -p "$(cat open_ports.txt)" -A -oA all-tcp "$RHOST"
 
