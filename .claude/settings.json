@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "andrej-karpathy-skills@karpathy-skills": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(chezmoi *)",
+      "Bash(git *)",
+      "Bash(brew *)",
+      "Bash(shellcheck *)",
+      "Read(.)"
+    ]
+  }
+}
