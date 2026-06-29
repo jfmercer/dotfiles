@@ -8,6 +8,11 @@
       "Bash(git *)",
       "Bash(brew *)",
       "Bash(shellcheck *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(jq *)",
+      "Bash(grep *)",
+      "Bash(delta *)",
       "Read(.)"
     ]
   }
