@@ -27,8 +27,7 @@ done
 source $DOTFILES/zsh/prompt.zsh
 
 # load plugins without a plugin manager
-# they must first be installed via plugins/install.sh
-# update by running update-zsh-plugins
+# they are fetched and refreshed by chezmoi (see .chezmoiexternal.yaml)
 # inspiration taken from https://github.com/mattmc3/zsh_unplugged
 ZPLUGINDIR=$HOME/.local/zsh-plugins
 source $ZPLUGINDIR/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh
@@ -52,8 +51,18 @@ bindkey '^ ' autosuggest-accept
 # bindkey 'KEYBINDING' autosuggest-execute
 
 # initialize autocomplete here, otherwise functions won't be loaded
+# only regenerate the dump once every 24h; otherwise skip the security
+# check (-C) to speed up interactive shell startup
 autoload -Uz compinit
-compinit
+# glob the dump into an array (filename generation doesn't happen inside [[ ]]),
+# then count matches: >0 means the dump is older than 24h and should be rebuilt
+_zdump=(${HOME}/.zcompdump(#qN.mh+24))
+if (( ${#_zdump} )); then
+  compinit
+else
+  compinit -C
+fi
+unset _zdump
 
 unset config_files
 
@@ -65,9 +74,5 @@ fi
 
 # Fixes wonky control flow issues
 stty -ixon -ixoff
-
-# fzf fuzzy finder
-# this goes last, I think
-# [ -f "$DOTFILES"/fzf/fzf.zsh ] && source "$DOTFILES"/fzf/fzf.zsh
 
 # zprof

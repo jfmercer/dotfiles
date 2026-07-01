@@ -23,6 +23,10 @@ Apply to a fresh machine (one-liner):
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
 
+## Working with changes
+
+Edits to tracked files only take effect in `$HOME` after `chezmoi apply` runs — the source directory and `$HOME` can diverge. Before testing a change (e.g. running a tool to see if a config edit worked) or claiming a change is in effect, check whether `chezmoi apply` has been run since the edit (e.g. `chezmoi status` or diff the source file against its `$HOME` target). If it hasn't, remind the user it needs to be run — either to make the change live, or before you can test it yourself.
+
 ## Architecture
 
 ### File naming conventions (chezmoi)
@@ -39,7 +43,6 @@ Prompts for `email`, `install_mac_apps`, `install_linux_apps`, and `set_git_to_s
 Scripts in `.chezmoiscripts/` root run on all platforms; those in `darwin/` or `linux/` subdirs run only on that platform.
 - `.chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl` — installs Homebrew packages/casks (macOS only)
 - `.chezmoiscripts/linux/` — parallel installs for Linux (apt-based, Parrot OS, arm64)
-- `.chezmoiscripts/run_onchange_before_10_homebrew.sh.tmpl` — cross-platform Homebrew install (differs from darwin/ version)
 - `.chezmoiscripts/run_onchange_after_100_vim.sh.tmpl` — vim plugin setup
 - `.chezmoiscripts/run_once_after_110_fix_git_upstream.sh.tmpl` — switches remote from HTTPS to SSH (runs once)
 
@@ -63,8 +66,6 @@ Each tool/concern has its own directory with `.zsh` files:
 
 Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`, `navi`, `rust`, `system`, `vagrant`, `zed`, `zsh`.
 
-Note: `fzf/fzf.zsh.old`, `system/grc.zsh.old`, and `bin/git-undo.disabled` are inactive — ignore them.
-
 ### `bin/` scripts
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
 - `bupdate` — `brew update && brew upgrade && brew cleanup`
@@ -72,6 +73,8 @@ Custom executables that run in-place from the chezmoi source directory. `system/
 - `enum`, `makeEnv` — misc utilities
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
 - `ps*.ps1` — PowerShell helpers (Base64 encode, reverse shell scaffold)
+- `time-startup` — times interactive zsh startup
+- `update-discord` — downloads and installs the latest Discord .deb (Linux)
 
 ### Unmanaged directories
 All directories without a `dot_`, `run_`, or `empty_` prefix are unmanaged — chezmoi never applies them to `$HOME`. They are listed in `.chezmoiignore` to suppress warnings.
@@ -83,7 +86,7 @@ All directories without a `dot_`, `run_`, or `empty_` prefix are unmanaged — c
 - `.claude/` — Claude Code config (this directory)
 - `.github/` — GitHub Actions CI workflows
 - `.vscode/` — VS Code workspace settings
-- `scripts/` — bootstrap and install scripts (`scripts/archive/` contains old inactive scripts)
+- `scripts/` — bootstrap and install scripts
 
 **App configs** (installed manually or via their own install scripts):
 - `bin/` — custom executables (see bin/ scripts above)

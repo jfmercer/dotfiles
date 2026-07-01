@@ -7,14 +7,14 @@
 {{- $set_git_to_ssh := true -}}
 
 {{- if $interactive -}}
-{{-   $email = promptString "email for .gitconfig" -}}
+{{-   $email = promptStringOnce . "email" "email for .gitconfig" $email -}}
 {{-   if (eq .chezmoi.os "darwin") -}}
-{{-     $install_mac_apps = eq (promptString "Install Mac applications (y/n)") "y" -}}
+{{-     $install_mac_apps = promptBoolOnce . "install_mac_apps" "Install Mac applications" $install_mac_apps -}}
 {{-   end -}}
 {{-   if (eq .chezmoi.os "linux") -}}
-{{-     $install_linux_apps = eq (promptString "Install Linux applications (y/n)") "y" -}}
+{{-     $install_linux_apps = promptBoolOnce . "install_linux_apps" "Install Linux applications" $install_linux_apps -}}
 {{-   end -}}
-{{-   $set_git_to_ssh = eq (promptString "Switch git repo from HTTPS to SSH? (y/n)") "y" -}}
+{{-   $set_git_to_ssh = promptBoolOnce . "set_git_to_ssh" "Switch git repo from HTTPS to SSH" $set_git_to_ssh -}}
 {{- end -}}
 
 {{- $osid := .chezmoi.os -}}
