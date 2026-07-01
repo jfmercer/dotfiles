@@ -1,3 +1,4 @@
 font-family = "Menlo Regular for Powerline"
 font-size   = 22
 theme       = "Molokai"
+bell-features = no-title,no-attention,no-system,no-audio,no-border

@@ -8,6 +8,11 @@ on:
     branches:
       - master
 
+# Cancel in-progress runs when a newer commit is pushed to the same ref
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -15,8 +20,8 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Echo branch name
         run: echo "GITHUB_HEAD_REF is $GITHUB_HEAD_REF"
       - name: Test dotfiles installation
-        run: DOTFILES_BRANCH=$GITHUB_HEAD_REF bash -c scripts/install_dotfiles.sh
+        run: DOTFILES_BRANCH=$GITHUB_HEAD_REF bash scripts/install_dotfiles.sh

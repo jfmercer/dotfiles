@@ -44,10 +44,7 @@
     ignorecase = false
     # the default is 'less -FRSX'
     pager = delta --diff-so-fancy
-
-[credential]
-#     helper = osxkeychain
-	authority = basic
+    autocrlf = input
 
 [delta]
     navigate = true
@@ -66,8 +63,11 @@
     diffFilter = delta --color-only
 
 [merge]
-    conflictStyle = diff3
+    # zdiff3 (Git 2.35+) is a strictly better diff3
+    conflictStyle = zdiff3
 
 [push]
     # This is the default in Git 2.0
     default = simple
+    # Auto-create the upstream branch on first push (Git 2.37+)
+    autoSetupRemote = true

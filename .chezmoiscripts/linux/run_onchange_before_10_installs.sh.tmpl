@@ -87,11 +87,9 @@ packages+=("${sec_packages[@]}")
 
 {{ end }}
 
-# Loop through the array and install each package
-for package in "${packages[@]}"; do
-    echo "Installing $package..."
-    sudo apt install -y $package
-done
+# Install all packages in a single transaction (faster and atomic)
+echo "Installing packages: ${packages[*]}"
+sudo apt install -y "${packages[@]}"
 
 {{ if eq .osid "linux-kali" }}
 
@@ -107,7 +105,7 @@ pipx_packages=(
 
 for pipx_package in "${pipx_packages[@]}"; do
     echo "Installing pipx package $pipx_package"
-    pipx install $pipx_package
+    pipx install "$pipx_package"
 done
 
 if [ -f /usr/share/wordlists/rockyou.gz ]; then
@@ -118,13 +116,14 @@ fi
 {{ end }}
 
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
-if [ ! -d /etc/apt/keyrings ]; then
+# only set up the apt repo once; re-running is a no-op
+if [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
     sudo mkdir -p /etc/apt/keyrings
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+    sudo apt update
 fi
-wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
-sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
-sudo apt update
 sudo apt install -y eza
 
 ### RUST INSTALLS
