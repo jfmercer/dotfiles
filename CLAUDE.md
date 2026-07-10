@@ -70,6 +70,7 @@ Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
 - `bupdate` — `brew update && brew upgrade && brew cleanup`
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
+- `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`)
 - `enum`, `makeEnv` — misc utilities
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
 - `ps*.ps1` — PowerShell helpers (Base64 encode, reverse shell scaffold)
