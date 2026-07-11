@@ -1,0 +1,13 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/usr/bin/env bash
+
+# Symlink Zed's bundled CLI into ~/.local/bin.
+# Runs on every `chezmoi apply` (plain run_ script) so it also picks up a
+# Zed installed after the initial apply. This used to happen on every shell
+# startup in zed/zed.zsh.
+ZED_CLI="$HOME/Applications/Zed.app/Contents/MacOS/cli"
+if [ -x "$ZED_CLI" ]; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$ZED_CLI" "$HOME/.local/bin/zed"
+fi
+{{- end -}}

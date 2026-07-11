@@ -1,1 +1,1 @@
-eval "$(atuin init zsh --disable-up-arrow)"
+cached-eval atuin-init atuin init zsh --disable-up-arrow

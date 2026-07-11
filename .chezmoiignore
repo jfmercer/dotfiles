@@ -14,12 +14,10 @@ homebrew/
 iterm2/
 kali/
 macos/
-navi/
 rust/
 scripts/
 system/
 terminal/
 vagrant/
-zed/
 zsh/
 install.sh
