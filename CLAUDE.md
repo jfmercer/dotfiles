@@ -43,6 +43,8 @@ Prompts for `email`, `install_mac_apps`, `install_linux_apps`, and `set_git_to_s
 Scripts in `.chezmoiscripts/` root run on all platforms; those in `darwin/` or `linux/` subdirs run only on that platform.
 - `.chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl` — installs Homebrew packages/casks (macOS only)
 - `.chezmoiscripts/linux/` — parallel installs for Linux (apt-based, Parrot OS, arm64)
+- `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl` — symlinks Zed's CLI into `~/.local/bin/zed` (every apply, macOS only)
+- `.chezmoiscripts/run_after_30_asdf_completions.sh` — generates asdf zsh completions into `~/.asdf/completions` (every apply)
 - `.chezmoiscripts/run_onchange_after_100_vim.sh.tmpl` — vim plugin setup
 - `.chezmoiscripts/run_once_after_110_fix_git_upstream.sh.tmpl` — switches remote from HTTPS to SSH (runs once)
 
@@ -54,8 +56,10 @@ Chezmoi fetches these automatically (weekly refresh): vim-plug, zsh plugins (pur
 2. `*/path.zsh` files — `$PATH` modifications
 3. `zsh/prompt.zsh` — pure prompt
 4. Plugins from `~/.local/zsh-plugins/` (order matters: syntax-highlighting before history-substring-search)
-5. All remaining `*.zsh` files in topic directories
+5. All remaining `*.zsh` files in topic directories (excluding `path.zsh`, `exports.zsh`, and `prompt.zsh`, already loaded above)
 6. `~/.localrc` if present (machine-local secrets, not tracked)
+
+Startup performance: `dot_zshrc` defines a `cached-eval` helper that caches the output of `eval "$(cmd init ...)"` style hooks in `~/.cache/zsh/` and re-runs the command only when the tool's binary is newer than the cache (used by `atuin/atuin.zsh` and `homebrew/homebrew.zsh`). Prefer `cached-eval <cache-name> <cmd> <args...>` over `eval "$(...)"` for new integrations, zsh builtin parameters (`$OSTYPE`, `$HOST`, `$TTY`, `$commands[...]`) over `$(uname)`/`$(tty)`/`$(which ...)` forks, and chezmoi apply-time scripts over per-shell setup work.
 
 ### Topical organization
 Each tool/concern has its own directory with `.zsh` files:
@@ -64,7 +68,7 @@ Each tool/concern has its own directory with `.zsh` files:
 - `alii.zsh` — aliases
 - `*.zsh` — everything else
 
-Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`, `navi`, `rust`, `system`, `vagrant`, `zed`, `zsh`.
+Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`, `rust`, `system`, `vagrant`, `zsh`.
 
 ### `bin/` scripts
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
@@ -74,14 +78,14 @@ Custom executables that run in-place from the chezmoi source directory. `system/
 - `enum`, `makeEnv` — misc utilities
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
 - `ps*.ps1` — PowerShell helpers (Base64 encode, reverse shell scaffold)
-- `time-startup` — times interactive zsh startup
+- `time-startup` — times 10 interactive zsh startups
 - `update-discord` — downloads and installs the latest Discord .deb (Linux)
 
 ### Unmanaged directories
 All directories without a `dot_`, `run_`, or `empty_` prefix are unmanaged — chezmoi never applies them to `$HOME`. They are listed in `.chezmoiignore` to suppress warnings.
 
 **Topic directories** — contain `.zsh` files sourced directly from the chezmoi source directory by `dot_zshrc` (see Zsh loading order above). None are applied to `$HOME` by chezmoi.
-`asdf/`, `atuin/`, `fzf/`, `git/`, `gpg/`, `homebrew/`, `kali/`, `macos/`, `navi/`, `rust/`, `system/`, `vagrant/`, `zed/`, `zsh/`
+`asdf/`, `atuin/`, `fzf/`, `git/`, `gpg/`, `homebrew/`, `kali/`, `macos/`, `rust/`, `system/`, `vagrant/`, `zsh/`
 
 **Tooling/meta:**
 - `.claude/` — Claude Code config (this directory)
@@ -94,7 +98,7 @@ All directories without a `dot_`, `run_`, or `empty_` prefix are unmanaged — c
 - `iterm2/` — iTerm2 plist + `install.sh`
 - `terminal/` — macOS Terminal.app profiles (MATE, Monokai)
 
-Note: `zed/` appears twice with different roles. `zed/zed.zsh` (topic dir, sourced by `dot_zshrc`) symlinks Zed's CLI binary into `~/.local/bin/zed` at shell startup. `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`.
+Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`.
 
 ### `dot_gitignore` vs `.gitignore`
 Two gitignore files coexist in this repo. `dot_gitignore` is managed by chezmoi and becomes `~/.gitignore` (the global gitignore). `.gitignore` is the repo's own gitignore and only excludes `system/linux.zsh`. When editing the global gitignore, use `dot_gitignore`.

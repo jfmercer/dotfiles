@@ -8,6 +8,27 @@
 
 export DOTFILES="$HOME/.local/share/chezmoi"
 
+# cache the output of `eval "$(cmd ...)"` style init hooks and source the
+# cached file instead; regenerate only when the tool's binary is newer than
+# the cache, so the warm path costs zero forks
+_zsh_cache=${XDG_CACHE_HOME:-$HOME/.cache}/zsh
+cached-eval() {
+  local name=$1 bin
+  shift
+  if [[ $1 == */* ]]; then
+    bin=$1
+  else
+    bin=$commands[$1]
+  fi
+  [[ -x $bin ]] || return 0
+  local cache=$_zsh_cache/$name.zsh
+  if [[ ! -s $cache || $bin -nt $cache ]]; then
+    mkdir -p $_zsh_cache
+    "$@" > $cache
+  fi
+  source $cache
+}
+
 # declare an array of our .zsh files
 # -U removes duplicate values
 typeset -U config_files
@@ -37,8 +58,10 @@ source $ZPLUGINDIR/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh
 source $ZPLUGINDIR/zsh-history-substring-search/zsh-history-substring-search.plugin.zsh
 source $ZPLUGINDIR/zsh-z/zsh-z.plugin.zsh
 
-# load everything but the path and exports files
-for file in ${${config_files:#*/path.zsh}:#*/exports.zsh}; do
+# load everything but the path, exports, and prompt files
+# (prompt.zsh was already sourced above; sourcing it again would run
+# promptinit/prompt pure twice)
+for file in ${${${config_files:#*/path.zsh}:#*/exports.zsh}:#*/prompt.zsh}; do
   source "$file"
 done
 

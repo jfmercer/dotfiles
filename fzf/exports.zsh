@@ -12,7 +12,7 @@ export FZF_CTRL_T_COMMAND="fd $FD_OPTIONS"
 export FZF_ALT_C_COMMAND="fd --type d $FD_OPTIONS"
 
 # On Linux, we need fdfind instead of fd and batcat instead of bat.
-if [[ "$(uname)" == "Linux" ]]; then
+if [[ "$OSTYPE" == linux* ]]; then
     # with file preview
     # export FZF_DEFAULT_OPTS="--no-mouse --height 90% -1 --reverse --multi --inline-info --preview='[[ \$(file --mime {}) =~ binary ]] && echo {} is a binary file || (batcat --style=numbers --color=always {} || cat {}) 2> /dev/null | head -300'"
     # without file preview
