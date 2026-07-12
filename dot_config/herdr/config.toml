@@ -1,0 +1,59 @@
+# herdr configuration — applied to ~/.config/herdr/config.toml by chezmoi
+#
+# This file is intentionally kept aligned with the tmux config (dot_tmux.conf
+# in the chezmoi source directory). When changing a setting in either file,
+# mirror its counterpart in the other; each aligned setting below cites the
+# tmux line it corresponds to. Full reference: `herdr --default-config`.
+# Reload a running herdr with: herdr server reload-config
+
+[theme]
+# tmux uses themepack powerline/default/blue, which has no herdr equivalent;
+# catppuccin (herdr's default) instead, following the host light/dark mode.
+name = "catppuccin"
+auto_switch = true
+dark_name = "catppuccin"
+light_name = "catppuccin-latte"
+
+[keys]
+# tmux: set -g prefix C-a
+prefix = "ctrl+a"
+# tmux: bind | split-window -h   (side-by-side; herdr default is prefix+v)
+split_vertical = "prefix+|"
+# tmux: bind - split-window -v   (stacked; herdr default already matches)
+split_horizontal = "prefix+minus"
+# tmux: bind h/j/k/l select-pane -L/-D/-U/-R   (herdr defaults already match)
+focus_pane_left = "prefix+h"
+focus_pane_down = "prefix+j"
+focus_pane_up = "prefix+k"
+focus_pane_right = "prefix+l"
+# Differences from tmux with no config counterpart, for the record:
+# - tmux bind C-a last-window: no herdr equivalent — herdr reserves
+#   prefix+prefix to send a literal Ctrl-a to the app (what tmux's
+#   `bind a send-prefix` did), and herdr has no last-tab action
+#   (last_pane exists but may not be bound to the prefix key)
+# - tmux bind -r H/J/K/L resize-pane: herdr uses a modal resize on its default
+#   prefix+r (then h/j/k/l resize while the mode is open)
+# - tmux prefix+r (reload config): prefix+shift+r in herdr by default
+# - tmux bind Up/Down resize-pane -Z: zoom stays on herdr's default prefix+z
+# - copy mode is prefix+[ with vi keys like tmux (mode-keys vi); y or Enter
+#   copies to the system clipboard (replaces tmux-yank), and mouse drag-select
+#   copies directly without entering copy mode
+
+[ui]
+# tmux: set -g mouse on
+mouse_capture = true
+
+[session]
+# tmux: tmux-resurrect + @continuum-restore 'on' — herdr sessions natively
+# survive restarts; also resume supported agent panes (herdr default, stated)
+resume_agents_on_restore = true
+
+[experimental]
+# tmux: resurrect/continuum also saved pane contents — keep recent pane
+# screen history across full server restarts (herdr default is false)
+pane_history = true
+
+[advanced]
+# tmux: set -g history-limit 50000 (lines) — herdr counts bytes per pane;
+# the 10 MB default comfortably exceeds 50k lines, stated here for parity
+scrollback_limit_bytes = 10000000
