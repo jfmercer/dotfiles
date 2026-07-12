@@ -98,7 +98,10 @@ All directories without a `dot_`, `run_`, or `empty_` prefix are unmanaged — c
 - `iterm2/` — iTerm2 plist + `install.sh`
 - `terminal/` — macOS Terminal.app profiles (MATE, Monokai)
 
-Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`.
+Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`. `dot_config/herdr/config.toml` (managed by chezmoi) is herdr's config, applied to `~/.config/herdr/config.toml`.
+
+### tmux / herdr alignment
+`dot_tmux.conf` and `dot_config/herdr/config.toml` are intentionally kept aligned (same Ctrl-a prefix, `|`/`-` split keys, vi copy mode, session-persistence behavior). When changing a setting in one, mirror the equivalent setting in the other — the tmux↔herdr mapping lives as comments in `dot_config/herdr/config.toml`.
 
 ### `dot_gitignore` vs `.gitignore`
 Two gitignore files coexist in this repo. `dot_gitignore` is managed by chezmoi and becomes `~/.gitignore` (the global gitignore). `.gitignore` is the repo's own gitignore and only excludes `system/linux.zsh`. When editing the global gitignore, use `dot_gitignore`.
