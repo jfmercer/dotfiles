@@ -1,4 +1,6 @@
 alias reload="exec $SHELL -l"
+# Reload every herdr shell pane at once (see bin/herdr-reload-all)
+alias hra="herdr-reload-all"
 
 # Easier navigation: .., ..., ...., ....., ~ and -
 alias ..="cd .."

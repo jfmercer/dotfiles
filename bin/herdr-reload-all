@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#
+# herdr-reload-all - re-exec the login shell in every herdr shell pane at once.
+#
+# Runs the `reload` alias (exec $SHELL -l) in every herdr pane that is NOT hosting
+# an AI agent, so updated dotfiles take effect across all tabs and workspaces without
+# reloading each pane by hand. Agent panes (e.g. claude) are skipped so "reload" is
+# never typed into an agent's prompt.
+#
+# Usage: herdr-reload-all
+
+set -euo pipefail
+IFS=$'\n\t'
+
+exit_with_error() {
+    echo "ERROR: $1" >&2
+    exit 1
+}
+
+command -v herdr >/dev/null 2>&1 || exit_with_error "herdr not found on PATH"
+command -v jq    >/dev/null 2>&1 || exit_with_error "jq not found on PATH"
+
+# `herdr pane list` emits JSON by default; keep only non-agent (shell) panes.
+herdr pane list \
+    | jq -r '.result.panes[] | select(.agent == null) | .pane_id' \
+    | while read -r pane; do
+        herdr pane run "$pane" 'reload' || echo "WARN: could not reload $pane" >&2
+    done
