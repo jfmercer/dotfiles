@@ -1,0 +1,27 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/usr/bin/env bash
+
+# Put Tailscale.app's bundled CLI on PATH as ~/.local/bin/tailscale.
+# Runs on every `chezmoi apply` (plain run_ script) so it also picks up a
+# Tailscale installed after the initial apply. No-op when Tailscale isn't
+# installed.
+#
+# This writes a wrapper script, NOT a symlink: the standalone (macsys) Tailscale
+# binary locates its own .app bundle from the path it was launched by, so a
+# symlink outside the bundle makes it panic ("bundleIdentifier is unknown to the
+# registry"). exec-ing the real bundle path avoids that. (Tailscale documents
+# /usr/local/bin, but that needs sudo and this apply runs unprivileged;
+# ~/.local/bin is on PATH and needs none.)
+TAILSCALE_CLI="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+TAILSCALE_LINK="$HOME/.local/bin/tailscale"
+if [ -x "$TAILSCALE_CLI" ]; then
+    mkdir -p "$HOME/.local/bin"
+    # replace any prior symlink from an earlier version of this script
+    rm -f "$TAILSCALE_LINK"
+    cat > "$TAILSCALE_LINK" <<EOF
+#!/bin/sh
+exec "$TAILSCALE_CLI" "\$@"
+EOF
+    chmod +x "$TAILSCALE_LINK"
+fi
+{{- end -}}

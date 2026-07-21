@@ -73,6 +73,10 @@ bindkey '^ ' autosuggest-accept
 # Currently not bound: accept and execute autosuggestion
 # bindkey 'KEYBINDING' autosuggest-execute
 
+# tool completions generated at `chezmoi apply` time land here (e.g. op);
+# see .chezmoiscripts/run_after_*_completions.sh
+fpath=($_zsh_cache/completions $fpath)
+
 # initialize autocomplete here, otherwise functions won't be loaded
 # only regenerate the dump once every 24h; otherwise skip the security
 # check (-C) to speed up interactive shell startup

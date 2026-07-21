@@ -44,7 +44,9 @@ Scripts in `.chezmoiscripts/` root run on all platforms; those in `darwin/` or `
 - `.chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl` — installs Homebrew packages/casks (macOS only)
 - `.chezmoiscripts/linux/` — parallel installs for Linux (apt-based, Parrot OS, arm64)
 - `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl` — symlinks Zed's CLI into `~/.local/bin/zed` (every apply, macOS only)
+- `.chezmoiscripts/darwin/run_after_25_tailscale_cli.sh.tmpl` — puts Tailscale.app's CLI on `PATH` as `~/.local/bin/tailscale` via a small `exec` wrapper (not a symlink — the standalone Tailscale binary resolves its `.app` bundle from its launch path and panics through a symlink) (every apply, macOS only; no-op when Tailscale isn't installed)
 - `.chezmoiscripts/run_after_30_asdf_completions.sh` — generates asdf zsh completions into `~/.asdf/completions` (every apply)
+- `.chezmoiscripts/run_after_40_op_completions.sh` — generates 1Password CLI (`op`) zsh completions into `~/.cache/zsh/completions/_op`, only when `op` is installed (every apply; no-op otherwise, and `op` is not installed by this repo)
 - `.chezmoiscripts/run_onchange_after_100_vim.sh.tmpl` — vim plugin setup
 - `.chezmoiscripts/run_once_after_110_fix_git_upstream.sh.tmpl` — switches remote from HTTPS to SSH (runs once)
 
@@ -60,6 +62,8 @@ Chezmoi fetches these automatically (weekly refresh): vim-plug, zsh plugins (pur
 6. `~/.localrc` if present (machine-local secrets, not tracked)
 
 Startup performance: `dot_zshrc` defines a `cached-eval` helper that caches the output of `eval "$(cmd init ...)"` style hooks in `~/.cache/zsh/` and re-runs the command only when the tool's binary is newer than the cache (used by `atuin/atuin.zsh` and `homebrew/homebrew.zsh`). Prefer `cached-eval <cache-name> <cmd> <args...>` over `eval "$(...)"` for new integrations, zsh builtin parameters (`$OSTYPE`, `$HOST`, `$TTY`, `$commands[...]`) over `$(uname)`/`$(tty)`/`$(which ...)` forks, and chezmoi apply-time scripts over per-shell setup work.
+
+Completions: tool completions generated at apply time land in the shared `~/.cache/zsh/completions/` dir, which `dot_zshrc` adds to `fpath` before `compinit` (used by the `op` completions script). Drop a `_toolname` file there from a `run_after_*_completions.sh` script and `compinit` picks it up — no per-shell generation and no `fpath` change needed. (asdf is the exception: its completions live in asdf's own `~/.asdf/completions`, added to `fpath` by `asdf/asdf.zsh`.)
 
 ### Topical organization
 Each tool/concern has its own directory with `.zsh` files:
