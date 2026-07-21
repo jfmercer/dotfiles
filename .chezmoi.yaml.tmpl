@@ -5,6 +5,9 @@
 {{- $install_mac_apps := true -}}
 {{- $install_linux_apps := true -}}
 {{- $set_git_to_ssh := true -}}
+# Work-only git config (e.g. the Hagerty Azure DevOps URL rewrite). Defaults false
+# so personal machines and CI never get it; set true only on work machines.
+{{- $work := false -}}
 
 {{- if $interactive -}}
 {{-   $email = promptStringOnce . "email" "email for .gitconfig" $email -}}
@@ -15,6 +18,7 @@
 {{-     $install_linux_apps = promptBoolOnce . "install_linux_apps" "Install Linux applications" $install_linux_apps -}}
 {{-   end -}}
 {{-   $set_git_to_ssh = promptBoolOnce . "set_git_to_ssh" "Switch git repo from HTTPS to SSH" $set_git_to_ssh -}}
+{{-   $work = promptBoolOnce . "work" "Is this a work machine" $work -}}
 {{- end -}}
 
 {{- $osid := .chezmoi.os -}}
@@ -35,4 +39,5 @@ data:
   install_mac_apps: {{ $install_mac_apps }}
   install_linux_apps: {{ $install_linux_apps }}
   set_git_to_ssh: {{ $set_git_to_ssh }}
+  work: {{ $work }}
   osid: {{ $osid | quote }}

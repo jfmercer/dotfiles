@@ -71,3 +71,9 @@
     default = simple
     # Auto-create the upstream branch on first push (Git 2.37+)
     autoSetupRemote = true
+{{- if get . "work" }}
+
+# Work only: rewrite Hagerty Azure DevOps HTTPS remotes to SSH.
+[url "git@ssh.dev.azure.com:v3/hagerty/Hagerty/"]
+    insteadOf = https://hagerty@dev.azure.com/hagerty/Hagerty/_git/
+{{- end }}
