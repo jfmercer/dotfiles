@@ -79,7 +79,7 @@ Custom executables that run in-place from the chezmoi source directory. `system/
 - `bupdate` — `brew update && brew upgrade && brew cleanup`
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
 - `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`)
-- `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces
+- `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)
 - `enum`, `makeEnv` — misc utilities
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
 - `ps*.ps1` — PowerShell helpers (Base64 encode, reverse shell scaffold)
