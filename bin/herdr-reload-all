@@ -7,6 +7,11 @@
 # reloading each pane by hand. Agent panes (e.g. claude) are skipped so "reload" is
 # never typed into an agent's prompt.
 #
+# If the herdr CLI has outpaced the running server (a "protocol mismatch", common
+# after `brew upgrade herdr`), this explains how to restart the server instead of
+# failing with a raw JSON error. It never restarts the server itself: that would
+# exit every pane process, including running agents.
+#
 # Usage: herdr-reload-all
 
 set -euo pipefail
@@ -20,8 +25,28 @@ exit_with_error() {
 command -v herdr >/dev/null 2>&1 || exit_with_error "herdr not found on PATH"
 command -v jq    >/dev/null 2>&1 || exit_with_error "jq not found on PATH"
 
-# `herdr pane list` emits JSON by default; keep only non-agent (shell) panes.
-herdr pane list \
+# `herdr pane list` prints a JSON envelope: {"result":...} on success, or
+# {"error":{"code","message"}} on failure. After `brew upgrade herdr` bumps the CLI
+# past the still-running server, that failure is code "protocol_mismatch" -- catch it
+# and explain the fix instead of leaking raw JSON or silently reloading nothing.
+panes_json="$(herdr pane list 2>&1)" || true
+
+err_code="$(printf '%s' "$panes_json" | jq -r '.error.code // empty' 2>/dev/null || true)"
+case "$err_code" in
+    "") ;;  # no error envelope -- fall through to the reload
+    protocol_mismatch)
+        exit_with_error "herdr CLI is newer than the running server (protocol mismatch).
+This is expected after 'brew upgrade herdr': the on-disk binary moved ahead of the
+long-running server. Restart the server to load the new version, then re-run hra:
+    herdr server stop && herdr
+WARNING: 'herdr server stop' exits every pane process (shells AND agents) --
+save your work first." ;;
+    *)
+        exit_with_error "herdr pane list failed ($err_code): $(printf '%s' "$panes_json" | jq -r '.error.message // .' 2>/dev/null)" ;;
+esac
+
+# Keep only non-agent (shell) panes and reload each.
+printf '%s' "$panes_json" \
     | jq -r '.result.panes[] | select(.agent == null) | .pane_id' \
     | while read -r pane; do
         herdr pane run "$pane" 'reload' || echo "WARN: could not reload $pane" >&2
