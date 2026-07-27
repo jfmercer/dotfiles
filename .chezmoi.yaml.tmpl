@@ -31,7 +31,11 @@
 {{-   $osid = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
 {{- end -}}
 
-verbose: true
+{{/* Off deliberately. This key spent years inside a stray `#` comment doing
+     nothing. Once that was fixed it turned every `chezmoi apply` into a full
+     diff piped through the pager, which is not what you want by default.
+     Use `chezmoi apply -v` on demand instead. */}}
+verbose: false
 
 diff:
   # exclude:

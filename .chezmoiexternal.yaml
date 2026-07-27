@@ -1,21 +1,23 @@
-# Upstream code fetched by chezmoi. Every entry is pinned to a tag (or a commit
-# where upstream publishes no tags) and checksummed.
+# Upstream code fetched by chezmoi. Every entry is pinned to an exact commit and
+# checksummed.
 #
 # WHY: these files are sourced into every interactive shell and every tmux
-# session. Tracking `master` with no integrity check meant that anyone who could
-# push to any one of these repos -- or intercept a raw.githubusercontent.com
-# response -- got arbitrary code execution here, automatically, within the
-# refreshPeriod. A checksum turns that into a loud failure instead.
+# session. Tracking `master` with no integrity check meant anyone able to push to
+# any one of these repos -- or intercept a raw.githubusercontent.com response --
+# got arbitrary code execution here, automatically, within the refreshPeriod.
+# A checksum turns that into a loud failure instead.
 #
-# BUMPING: refs are not updated automatically (Dependabot does not read this
-# file). To bump one, change the ref and recompute:
-#   curl -fsSL https://github.com/<owner>/<repo>/archive/<ref>.tar.gz | shasum -a 256
+# WHY COMMITS AND NOT TAGS: several of these projects stopped tagging years ago
+# while master kept moving (tmux-yank's last release is from 2018, five years
+# behind its master). Pinning to the latest tag would silently roll those
+# plugins back. A commit SHA is content-addressed, so it is at least as strong a
+# guarantee as a tag -- tags can be force-moved, commits cannot. The comment
+# above each entry records the date and nearest tag for human orientation.
+#
+# BUMPING: not automatic; Dependabot does not read this file. To bump one:
+#   sha=$(gh api repos/<owner>/<repo>/commits/HEAD --jq .sha)
+#   curl -fsSL https://github.com/<owner>/<repo>/archive/$sha.tar.gz | shasum -a 256
 # Then `chezmoi apply --refresh-externals` and confirm it exits 0.
-#
-# NOTE: GitHub's auto-generated archive tarballs are stable in practice but have
-# been regenerated once historically (2023), which invalidates checksums en
-# masse. If several entries fail at once with a checksum mismatch and the refs
-# are unchanged, suspect that rather than a compromise -- verify, then recompute.
 
 # vim plugin manager
 ".vim/autoload/plug.vim":
@@ -26,41 +28,47 @@
         sha256: "20b4c895f98d13848204698068c4dd031730d4e7c9c4b630d6273b9b9afcdcdb"
 
 # zsh plugins
+# sindresorhus/pure @ 2026-07-16 (nearest tag: v1.28.3)
 ".local/zsh-plugins/pure":
     type: "archive"
-    url: "https://github.com/sindresorhus/pure/archive/v1.28.3.tar.gz"
+    url: "https://github.com/sindresorhus/pure/archive/89c9e30a38d3d35457bcc58b43ea6c28ae56934b.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "738b523c59823083de490b3eb6c1116fc45c342e6b32a7d3cf05fdd0f8aa75a8"
+        sha256: "4e416cea4b75f68f42b70bc8ed154de94960422fa5471ae49f8baa09251e0323"
+# zsh-users/zsh-autosuggestions @ 2025-06-24 (nearest tag: v0.7.1)
 ".local/zsh-plugins/zsh-autosuggestions":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-autosuggestions/archive/v0.7.1.tar.gz"
+    url: "https://github.com/zsh-users/zsh-autosuggestions/archive/85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "0df7affff21cd87ed298e6a3970ed08a1dd66a6efa676454ee5b091ad503badf"
+        sha256: "20665e469e720e674964a66854d5534b9af78cdfd438512746ecd1ade8e819ce"
+# zsh-users/zsh-completions @ 2026-07-27 (nearest tag: 0.36.0)
 ".local/zsh-plugins/zsh-completions":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-completions/archive/0.36.0.tar.gz"
+    url: "https://github.com/zsh-users/zsh-completions/archive/bf2c5393295fe82d74e3b4585baa483722653ab8.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "5aa68be2999a7be2eb56de8e4acff8f3bba4a66b9acbb233752536857408fb2e"
+        sha256: "b3c78c5925342b46c530ad825d4fe22b27d6872d0f8a82138d474510563afbd6"
+# zsh-users/zsh-history-substring-search @ 2026-01-15 (nearest tag: v1.1.0)
 ".local/zsh-plugins/zsh-history-substring-search":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-history-substring-search/archive/v1.1.0.tar.gz"
+    url: "https://github.com/zsh-users/zsh-history-substring-search/archive/14c8d2e0ffaee98f2df9850b19944f32546fdea5.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "9b52eca6c894dd98caa5f07160199f3f3179ff017575d5acc9fdc467b1ac70f8"
+        sha256: "823ea186446669fb024b839b117122d03ee0b3b20e199c95e09e85695bd30b0f"
+# zsh-users/zsh-syntax-highlighting @ 2026-02-08 (nearest tag: 0.8.0)
 ".local/zsh-plugins/zsh-syntax-highlighting":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/0.8.0.tar.gz"
+    url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/1d85c692615a25fe2293bdd44b34c217d5d2bf04.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "5981c19ebaab027e356fe1ee5284f7a021b89d4405cc53dc84b476c3aee9cc32"
+        sha256: "e4a95feb737d78efa4052e23c4880e6936a3133ea58f390458fc80ea4033483e"
+# agkozak/zsh-z @ 2026-05-02
 ".local/zsh-plugins/zsh-z":
     type: "archive"
     url: "https://github.com/agkozak/zsh-z/archive/acd0e1984df350c189f8f9c4956ec586b6c73fca.tar.gz"
@@ -70,52 +78,59 @@
         sha256: "727e630fc33203c714f092ce87767abde872fa1bf91df90f408c3abec91a7273"
 
 # tmux plugin manager
+# tmux-plugins/tpm @ 2026-05-17 (nearest tag: v3.1.0)
 ".tmux/plugins/tpm":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tpm/archive/v3.1.0.tar.gz"
+    url: "https://github.com/tmux-plugins/tpm/archive/e261deb1b47614eed3400089ce7197dc68acc4eb.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "2411fc416c4475d297f61078d0a03afb3a1f5322fff26a13fdb4f20d7e975570"
+        sha256: "72d92c512270d4857e27519ac97b92a52cf149afe4d92f26860c710f60bbbe37"
+# tmux-plugins/tmux-resurrect @ 2023-03-06 (nearest tag: v4.0.0)
 ".tmux/plugins/tmux-resurrect":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-resurrect/archive/v4.0.0.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-resurrect/archive/cff343cf9e81983d3da0c8562b01616f12e8d548.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "f8559d86d81be769054d63b28a268229a09bc6cc311f0623656c3090ec781b76"
+        sha256: "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9"
+# tmux-plugins/tmux-continuum @ 2024-01-20 (nearest tag: v3.1.0)
 ".tmux/plugins/tmux-continuum":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-continuum/archive/v3.1.0.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-continuum/archive/0698e8f4b17d6454c71bf5212895ec055c578da0.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "311dddeebbf7b803cd19c339ab887784b715fd8ef206ec430028cabb8574de87"
+        sha256: "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f"
+# tmux-plugins/tmux-open @ 2022-08-22 (nearest tag: v3.0.0)
 ".tmux/plugins/tmux-open":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-open/archive/v3.0.0.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-open/archive/763d0a852e6703ce0f5090a508330012a7e6788e.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "3ee36a5b543c65eaf6688c619e434ce8076a1b17917e4be836c4e9c5ad80f3db"
+        sha256: "aeee405905203e811e3563c3e3243cf73ba53332da214b5bb17a22468e73bb85"
+# tmux-plugins/tmux-copycat @ 2020-07-24 (nearest tag: v3.0.0)
 ".tmux/plugins/tmux-copycat":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-copycat/archive/v3.0.0.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-copycat/archive/d7f7e6c1de0bc0d6915f4beea5be6a8a42045c09.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "0c59a5e0e01b3bf4daa988f3652933d0190c4bffbc823581011b112740609e67"
+        sha256: "9fba3f22fc51f79f14ae9419779e1268b5663f918a3d4b612d29773ab76286b7"
+# tmux-plugins/tmux-yank @ 2023-07-19 (nearest tag: v2.3.0)
 ".tmux/plugins/tmux-yank":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-yank/archive/v2.3.0.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-yank/archive/acfd36e4fcba99f8310a7dfb432111c242fe7392.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "f19a1f86de43cbae07bce7773d1c06cf58f7ef5ec2fc7dfb3484f476b9dc3b64"
+        sha256: "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84"
+# jimeh/tmux-themepack @ 2019-12-22 (nearest tag: 1.1.0)
 ".tmux/plugins/tmux-themepack":
     type: "archive"
-    url: "https://github.com/jimeh/tmux-themepack/archive/1.1.0.tar.gz"
+    url: "https://github.com/jimeh/tmux-themepack/archive/7c59902f64dcd7ea356e891274b21144d1ea5948.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "835a52123ef9ec90b043bc884e194d6391469c89ed39fc82811daf4f13106d54"
+        sha256: "d21005092831cbc9c6d990c42242b10091825956729329152c39d8ed91c35879"
