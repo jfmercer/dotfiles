@@ -1,85 +1,121 @@
+# Upstream code fetched by chezmoi. Every entry is pinned to a tag (or a commit
+# where upstream publishes no tags) and checksummed.
+#
+# WHY: these files are sourced into every interactive shell and every tmux
+# session. Tracking `master` with no integrity check meant that anyone who could
+# push to any one of these repos -- or intercept a raw.githubusercontent.com
+# response -- got arbitrary code execution here, automatically, within the
+# refreshPeriod. A checksum turns that into a loud failure instead.
+#
+# BUMPING: refs are not updated automatically (Dependabot does not read this
+# file). To bump one, change the ref and recompute:
+#   curl -fsSL https://github.com/<owner>/<repo>/archive/<ref>.tar.gz | shasum -a 256
+# Then `chezmoi apply --refresh-externals` and confirm it exits 0.
+#
+# NOTE: GitHub's auto-generated archive tarballs are stable in practice but have
+# been regenerated once historically (2023), which invalidates checksums en
+# masse. If several entries fail at once with a checksum mismatch and the refs
+# are unchanged, suspect that rather than a compromise -- verify, then recompute.
+
 # vim plugin manager
 ".vim/autoload/plug.vim":
     type: "file"
-    url: "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
+    url: "https://raw.githubusercontent.com/junegunn/vim-plug/0.14.0/plug.vim"
     refreshPeriod: "168h"
+    checksum:
+        sha256: "20b4c895f98d13848204698068c4dd031730d4e7c9c4b630d6273b9b9afcdcdb"
+
 # zsh plugins
 ".local/zsh-plugins/pure":
     type: "archive"
-    url: "https://github.com/sindresorhus/pure/archive/master.tar.gz"
+    url: "https://github.com/sindresorhus/pure/archive/v1.28.3.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "738b523c59823083de490b3eb6c1116fc45c342e6b32a7d3cf05fdd0f8aa75a8"
 ".local/zsh-plugins/zsh-autosuggestions":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-autosuggestions/archive/master.tar.gz"
+    url: "https://github.com/zsh-users/zsh-autosuggestions/archive/v0.7.1.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "0df7affff21cd87ed298e6a3970ed08a1dd66a6efa676454ee5b091ad503badf"
 ".local/zsh-plugins/zsh-completions":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-completions/archive/master.tar.gz"
+    url: "https://github.com/zsh-users/zsh-completions/archive/0.36.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "5aa68be2999a7be2eb56de8e4acff8f3bba4a66b9acbb233752536857408fb2e"
 ".local/zsh-plugins/zsh-history-substring-search":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-history-substring-search/archive/master.tar.gz"
+    url: "https://github.com/zsh-users/zsh-history-substring-search/archive/v1.1.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "9b52eca6c894dd98caa5f07160199f3f3179ff017575d5acc9fdc467b1ac70f8"
 ".local/zsh-plugins/zsh-syntax-highlighting":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/master.tar.gz"
+    url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/0.8.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "5981c19ebaab027e356fe1ee5284f7a021b89d4405cc53dc84b476c3aee9cc32"
 ".local/zsh-plugins/zsh-z":
     type: "archive"
-    url: "https://github.com/agkozak/zsh-z/archive/master.tar.gz"
+    url: "https://github.com/agkozak/zsh-z/archive/acd0e1984df350c189f8f9c4956ec586b6c73fca.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "727e630fc33203c714f092ce87767abde872fa1bf91df90f408c3abec91a7273"
+
 # tmux plugin manager
 ".tmux/plugins/tpm":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tpm/archive/master.tar.gz"
+    url: "https://github.com/tmux-plugins/tpm/archive/v3.1.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "2411fc416c4475d297f61078d0a03afb3a1f5322fff26a13fdb4f20d7e975570"
 ".tmux/plugins/tmux-resurrect":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-resurrect/archive/master.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-resurrect/archive/v4.0.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "f8559d86d81be769054d63b28a268229a09bc6cc311f0623656c3090ec781b76"
 ".tmux/plugins/tmux-continuum":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-continuum/archive/master.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-continuum/archive/v3.1.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "311dddeebbf7b803cd19c339ab887784b715fd8ef206ec430028cabb8574de87"
 ".tmux/plugins/tmux-open":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-open/archive/master.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-open/archive/v3.0.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "3ee36a5b543c65eaf6688c619e434ce8076a1b17917e4be836c4e9c5ad80f3db"
 ".tmux/plugins/tmux-copycat":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-copycat/archive/master.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-copycat/archive/v3.0.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "0c59a5e0e01b3bf4daa988f3652933d0190c4bffbc823581011b112740609e67"
 ".tmux/plugins/tmux-yank":
     type: "archive"
-    url: "https://github.com/tmux-plugins/tmux-yank/archive/master.tar.gz"
+    url: "https://github.com/tmux-plugins/tmux-yank/archive/v2.3.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "f19a1f86de43cbae07bce7773d1c06cf58f7ef5ec2fc7dfb3484f476b9dc3b64"
 ".tmux/plugins/tmux-themepack":
     type: "archive"
-    url: "https://github.com/jimeh/tmux-themepack/archive/master.tar.gz"
+    url: "https://github.com/jimeh/tmux-themepack/archive/1.1.0.tar.gz"
     exact: true
     stripComponents: 1
-    refreshPeriod: "168h"
+    checksum:
+        sha256: "835a52123ef9ec90b043bc884e194d6391469c89ed39fc82811daf4f13106d54"

@@ -32,10 +32,16 @@ error() {
   exit 1
 }
 
+# Pin the chezmoi version we bootstrap with. get.chezmoi.io is still trusted to
+# serve an honest installer -- that is unavoidable for a bootstrap -- but pinning
+# means a compromised endpoint cannot silently hand us a different chezmoi than
+# the one this repo was tested against. Bump with: chezmoi --version
+CHEZMOI_VERSION="v2.71.1"
+
 if ! chezmoi="$(command -v chezmoi)"; then
   bin_dir="${HOME}/.local/bin"
   chezmoi="${bin_dir}/chezmoi"
-  log_task "Installing chezmoi to '${chezmoi}'"
+  log_task "Installing chezmoi ${CHEZMOI_VERSION} to '${chezmoi}'"
   if command -v curl >/dev/null; then
     chezmoi_install_script="$(curl -fsSL https://get.chezmoi.io)"
   elif command -v wget >/dev/null; then
@@ -43,7 +49,7 @@ if ! chezmoi="$(command -v chezmoi)"; then
   else
     error "To install chezmoi, you must have curl or wget."
   fi
-  sh -c "${chezmoi_install_script}" -- -b "${bin_dir}"
+  sh -c "${chezmoi_install_script}" -- -b "${bin_dir}" -t "${CHEZMOI_VERSION}"
   unset chezmoi_install_script bin_dir
 fi
 

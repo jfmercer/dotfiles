@@ -3,6 +3,22 @@
 
 set -eufo pipefail
 
+# `chezmoi apply` is not an interactive zsh, so it does not inherit the PATH set
+# by homebrew/homebrew.zsh. On Apple Silicon /opt/homebrew/bin is not on the
+# default PATH, so without this `brew bundle` below dies with "command not
+# found" and takes the whole apply with it.
+for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if [ -x "$brew_bin" ]; then
+        eval "$("$brew_bin" shellenv)"
+        break
+    fi
+done
+unset brew_bin
+
+# Mirror homebrew/exports.zsh so apply-time installs match what an interactive
+# shell would do -- casks into ~/Applications, and checksums enforced.
+export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
+
 {{ $brews := list
      "asdf"
      "atuin"
@@ -37,7 +53,13 @@ set -eufo pipefail
      "tree"
      "vim"
      "wget" }}
-{{ $casks := list
+{{ $casks := list }}
+{{/* Casks upstream ships as `sha256 :no_check` -- they cannot satisfy
+     --require-sha, so they are installed in a second pass with that flag
+     dropped. Keep this list as short as possible and re-check with:
+       brew info --cask --json=v2 <token> | jq -r '.casks[].sha256'
+     Anything that gains a real checksum upstream should move to $casks. */}}
+{{ $casks_no_sha := list
      "font-gentium-plus"
      "font-menlo-for-powerline" }}
 
@@ -50,7 +72,13 @@ cask "{{ . }}"
 {{- end }}
 EOF
 
-# Complete fzf installation
-$(brew --prefix)/opt/fzf/install --key-bindings --completion --no-update-rc
+{{ if $casks_no_sha }}
+# Casks without an upstream checksum. --require-sha is stripped here only.
+HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications" brew bundle --file=/dev/stdin <<EOF
+{{- range ($casks_no_sha | sortAlpha | uniq) }}
+cask "{{ . }}"
+{{- end }}
+EOF
+{{ end }}
 
 {{ end }}

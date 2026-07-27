@@ -1,0 +1,33 @@
+# ~/.zshenv — sourced by EVERY zsh: interactive, non-interactive, login,
+# scripts, `ssh host 'cmd'`, cron, launchd, git hooks.
+#
+# Two hard rules for this file:
+#   1. It must stay cheap. It runs before every `#!/usr/bin/env zsh` script.
+#   2. It must NEVER print anything. Output here corrupts the scp/sftp/rsync
+#      protocols, which is a memorably confusing failure to debug.
+#
+# Only order-independent environment belongs here. Everything interactive
+# (aliases, plugins, prompt, completions) stays in .zshrc.
+
+export DOTFILES="$HOME/.local/share/chezmoi"
+
+# XDG base directories. Exported (not just defaulted at each use site) so that
+# non-interactive tools and the apply-time scripts agree on the same paths.
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+
+# vim for quick terminal edits and git commit messages; Zed is the GUI editor
+# (see the `c`/`erc` aliases in system/alii.zsh).
+export VISUAL="vim"
+export EDITOR="$VISUAL"
+
+# PATH is deliberately NOT set here. On macOS /etc/zprofile runs path_helper
+# AFTER this file and rebuilds PATH, demoting anything prepended here --
+# measured: asdf shims move from position 1 to position 13, behind
+# /usr/local/bin. PATH construction therefore stays in the */path.zsh topic
+# files, which .zshrc sources after path_helper has already run.
+#
+# Consequence, accepted knowingly: non-interactive shells (`ssh host 'cmd'`,
+# cron) do NOT get asdf shims, ~/.local/bin, or $DOTFILES/bin. Use an absolute
+# path, or `ssh host -t 'zsh -ic "..."'`, when you need them there.

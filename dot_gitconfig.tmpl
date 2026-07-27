@@ -73,7 +73,9 @@
     autoSetupRemote = true
 {{- if get . "work" }}
 
-# Work only: rewrite Hagerty Azure DevOps HTTPS remotes to SSH.
-[url "git@ssh.dev.azure.com:v3/hagerty/Hagerty/"]
-    insteadOf = https://hagerty@dev.azure.com/hagerty/Hagerty/_git/
+# Work machines only. Employer-specific settings (internal host names, URL
+# rewrites) live in an untracked file so they stay out of this public repo.
+# Create it by hand; git silently ignores the include if it does not exist.
+[include]
+    path = ~/.gitconfig.work
 {{- end }}

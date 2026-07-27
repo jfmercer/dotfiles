@@ -6,7 +6,10 @@
 # DO NOT RENAME THIS FILE
 # unless you enjoy infinite loops
 
-export DOTFILES="$HOME/.local/share/chezmoi"
+# Normally already exported by ~/.zshenv; the fallback keeps this file working
+# standalone (e.g. `ZDOTDIR=... zsh` against a source tree, or before the first
+# `chezmoi apply` puts .zshenv in place).
+export DOTFILES="${DOTFILES:-$HOME/.local/share/chezmoi}"
 
 # cache the output of `eval "$(cmd ...)"` style init hooks and source the
 # cached file instead; regenerate only when the tool's binary is newer than
@@ -81,15 +84,22 @@ fpath=($_zsh_cache/completions $fpath)
 # only regenerate the dump once every 24h; otherwise skip the security
 # check (-C) to speed up interactive shell startup
 autoload -Uz compinit
+# The dump is regenerable cache, so it lives under $XDG_CACHE_HOME alongside
+# cached-eval's output rather than cluttering $HOME. zsh/completion.zsh puts
+# the per-command completion cache in the same place.
+_zdumpfile=$_zsh_cache/zcompdump
+# `mkdir` is an external command, so only pay the fork when the directory is
+# genuinely missing (i.e. once). [[ -d ]] is a builtin test.
+[[ -d $_zsh_cache ]] || mkdir -p $_zsh_cache
 # glob the dump into an array (filename generation doesn't happen inside [[ ]]),
 # then count matches: >0 means the dump is older than 24h and should be rebuilt
-_zdump=(${HOME}/.zcompdump(#qN.mh+24))
+_zdump=($_zdumpfile(#qN.mh+24))
 if (( ${#_zdump} )); then
-  compinit
+  compinit -d $_zdumpfile
 else
-  compinit -C
+  compinit -C -d $_zdumpfile
 fi
-unset _zdump
+unset _zdump _zdumpfile
 
 unset config_files
 
@@ -99,7 +109,9 @@ then
   source $HOME/.localrc
 fi
 
-# Fixes wonky control flow issues
-stty -ixon -ixoff
+# Fixes wonky control flow issues (disable XON/XOFF so ^S/^Q reach the app).
+# Guarded: without -t 0 this printed "stty: stdin isn't a terminal" on every
+# non-tty interactive shell, e.g. `zsh -i -c ...` from a script.
+[[ -t 0 ]] && stty -ixon -ixoff
 
 # zprof
