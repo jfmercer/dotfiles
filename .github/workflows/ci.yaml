@@ -28,13 +28,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
+      # Pinned to one version from upstream releases rather than each platform's
+      # package manager. Ubuntu's apt shellcheck lags Homebrew's by several
+      # releases, and the two disagree about which findings to report -- so an
+      # unpinned gate passes on one runner and fails on the other for identical
+      # code. Bump: gh api repos/koalaman/shellcheck/releases/latest --jq .tag_name
       - name: Install shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.11.0
         run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            brew install shellcheck
-          else
-            sudo apt-get update && sudo apt-get install -y shellcheck
-          fi
+          case "$RUNNER_OS-$(uname -m)" in
+            macOS-arm64)   plat=darwin.aarch64 ;;
+            macOS-x86_64)  plat=darwin.x86_64 ;;
+            Linux-aarch64) plat=linux.aarch64 ;;
+            *)             plat=linux.x86_64 ;;
+          esac
+          url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.${plat}.tar.xz"
+          curl -fsSL "$url" | tar -xJf - -C /tmp
+          sudo install "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
 
       - name: Shellcheck plain scripts
         run: |
