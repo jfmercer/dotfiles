@@ -177,9 +177,26 @@ Two rules for `~/.localrc`, since it runs on every interactive shell:
 
 - Never put a literal secret in it. Sensitive values belong in the Keychain and
   come back through the bundle.
-- Watch per-line forks generally, not just Keychain reads. Three
-  `ssh-add --apple-use-keychain` calls cost ~60 ms there; `AddKeysToAgent yes`
-  plus `UseKeychain yes` in `~/.ssh/config` achieves the same thing lazily.
+- Watch per-line forks generally, not just Keychain reads. Three eager
+  `ssh-add --apple-use-keychain` calls used to cost ~47 ms there. They are gone:
+  `~/.ssh/config` has `AddKeysToAgent yes` + `UseKeychain yes` under `Host *`
+  plus a per-host `IdentityFile`, so keys load on first use instead.
+
+**SSH host-pattern gotcha, learned the hard way.** `Host *.github.com` does
+**not** match `github.com` — the `*.` requires a subdomain. That config looked
+correct for years while doing nothing; GitHub SSH only worked because the eager
+`ssh-add` had pushed the key into the agent. Removing those lines without
+fixing the pattern would have broken push access. `gitlab.com` had no
+`IdentityFile` at all, for the same hidden reason. Always verify with:
+
+```bash
+ssh -G github.com | grep -E '^identityfile'   # must list the intended key
+SSH_AUTH_SOCK=/dev/null ssh -T git@github.com # proves it works without the agent
+```
+
+The `SSH_AUTH_SOCK=/dev/null` form is the important one: it bypasses the agent,
+so it tests what a brand-new shell actually gets rather than what a
+long-running agent happens to be holding.
 
 ### tmux / herdr alignment
 `dot_tmux.conf` and `dot_config/herdr/config.toml` are intentionally kept aligned (same Ctrl-a prefix, `|`/`-` split keys, vi copy mode, session-persistence behavior). When changing a setting in one, mirror the equivalent setting in the other — the tmux↔herdr mapping lives as comments in `dot_config/herdr/config.toml`.
