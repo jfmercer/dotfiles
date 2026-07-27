@@ -142,12 +142,23 @@ jobs:
           fi
           echo "No drift."
 
-  # The README tells people to pipe scripts/install_dotfiles.sh into bash. That
-  # path clones master from GitHub, so it can only be tested after a merge --
-  # hence push-only. DOTFILES_FORCE_RESET is required because the runner has no
-  # pre-existing source dir to preserve and we want the clean-slate behaviour.
+  # Exercises the documented `curl | bash` path end to end. Unlike `apply`, this
+  # actually runs scripts/install_dotfiles.sh -- the Homebrew-on-PATH fix, the
+  # DOTFILES_FORCE_RESET gate and the Xcode CLI tools check live there and are
+  # otherwise only shellchecked, never executed.
+  #
+  # install_dotfiles.sh clones DOTFILES_BRANCH from DOTFILES_USER's repo rather
+  # than using the checkout, so it can only test a branch that exists on the
+  # upstream remote. That holds for pushes and for same-repo pull requests, but
+  # not for forks -- GITHUB_HEAD_REF there names a branch on the fork. Hence the
+  # not-a-fork guard rather than push-only.
+  #
+  # Note this still cannot reproduce the Apple Silicon PATH bug: GitHub's macOS
+  # runners ship Homebrew already on PATH. That needs a clean VM.
   bootstrap:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -156,4 +167,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Test the documented curl | bash bootstrap
-        run: DOTFILES_FORCE_RESET=1 bash scripts/install_dotfiles.sh
+        env:
+          # GITHUB_HEAD_REF is set only for pull_request events; fall back to the
+          # pushed ref so a push to master tests master.
+          DOTFILES_BRANCH: ${{ github.head_ref || github.ref_name }}
+          # A fresh runner has no source directory, so this is a no-op today. Set
+          # anyway so the job keeps its clean-slate semantics if a runner image
+          # ever ships one, rather than failing the dirty-tree check.
+          DOTFILES_FORCE_RESET: "1"
+        run: bash scripts/install_dotfiles.sh
