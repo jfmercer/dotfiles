@@ -1,3 +1,11 @@
+####################
+# Machine-local    #
+####################
+
+# Employer-specific git config, included from ~/.gitconfig on work machines.
+# Never commit: this public repo should not carry internal host names or URLs.
+.gitconfig.work
+
 ##########
 # Claude #
 ##########

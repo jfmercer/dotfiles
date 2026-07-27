@@ -12,11 +12,13 @@ alias -- -="cd -"
 
 # Shortcuts
 alias C="cd ~/Code"
-alias c="code ."
+# Zed for project work (the CLI is symlinked by run_after_20_zed_symlink);
+# vim stays $EDITOR for quick terminal edits -- see `v`/`ev` below.
+alias c="zed ."
 alias dl="cd ~/Downloads"
 alias dt="cd ~/Desktop"
 alias cdrc="cd $DOTFILES"
-alias erc="code $DOTFILES"
+alias erc="zed $DOTFILES"
 alias h="history"
 alias v="vim ."
 alias ev="vim ~/.vimrc"
@@ -60,8 +62,12 @@ alias hd="hexdump -C"
 
 alias unixtime="date +%s"
 
-# File size
-alias fs="stat -c \"%s bytes\""
+# File size. BSD stat (macOS) uses -f/%z; GNU stat (Linux) uses -c/%s.
+if [[ $OSTYPE == darwin* ]]; then
+  alias fs='stat -f "%z bytes"'
+else
+  alias fs='stat -c "%s bytes"'
+fi
 
 # chezmoi
 alias cm=chezmoi
@@ -71,3 +77,14 @@ alias cm=chezmoi
 
 # colorize less
 alias less="less -R"
+
+# Debian renames two binaries to avoid conflicts, and has no pasteboard.
+# These used to be appended to a gitignored system/linux.zsh by a
+# run_onchange_ script, which duplicated them on every script edit and lost
+# them entirely whenever the source dir was cleaned.
+if [[ $OSTYPE == linux* ]]; then
+  alias bat='batcat'
+  alias fd='fdfind'
+  alias pbcopy='xclip -selection clipboard'
+  alias pbpaste='xclip -selection clipboard -o'
+fi

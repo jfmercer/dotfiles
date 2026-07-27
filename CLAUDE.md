@@ -37,12 +37,18 @@ Edits to tracked files only take effect in `$HOME` after `chezmoi apply` runs �
 - `.chezmoiscripts/` → scripts run by chezmoi at specific lifecycle points
 
 ### Template data (`.chezmoi.yaml.tmpl`)
-Prompts for `email`, `install_mac_apps`, `install_linux_apps`, `set_git_to_ssh`, and `work` at init time. These are available in templates as `.email`, `.install_mac_apps`, etc. In CI they default to `true`, except `work`, which defaults to `false` so work-only config (e.g. the Hagerty Azure DevOps URL rewrite in `dot_gitconfig.tmpl`) lands only on machines answered "yes". Reference `work` defensively as `get . "work"` so it stays safe on machines whose generated config (`~/.config/chezmoi/chezmoi.yaml`) predates the key — chezmoi reads that generated file, not the `.tmpl`, until `chezmoi init` is re-run.
+Prompts for `email`, `install_mac_apps`, `install_linux_apps`, `set_git_to_ssh`, and `work` at init time. These are available in templates as `.email`, `.install_mac_apps`, etc. In CI they default to `true`, except `work`, which defaults to `false`. Reference `work` defensively as `get . "work"` so it stays safe on machines whose generated config (`~/.config/chezmoi/chezmoi.yaml`) predates the key — chezmoi reads that generated file, not the `.tmpl`, until `chezmoi init` is re-run.
+
+**Comment with `{{/* … */}}`, never with a bare `#`.** A `#` comment in this file is emitted verbatim into the rendered YAML, and the surrounding whitespace-stripping delimiters swallow its trailing newline — which silently commented out `verbose: true` for a long time. Verify any edit with `chezmoi execute-template --init < .chezmoi.yaml.tmpl`.
+
+Because this file is rendered into `~/.config/chezmoi/chezmoi.yaml` at `chezmoi init` time, editing the template alone changes nothing on an existing machine. Re-run `chezmoi init` (or edit the generated file) to pick up new keys or changed defaults.
+
+**Work machines.** `work: true` makes `dot_gitconfig.tmpl` include an untracked `~/.gitconfig.work`. Employer-specific values (internal hostnames, URL rewrites) belong in that file, never in this repo — it is public. `~/.gitconfig.work` must be recreated by hand on each work machine; git silently ignores the include when it is absent, so a missing file degrades to "no rewrite" rather than an error.
 
 ### Script lifecycle
 Scripts in `.chezmoiscripts/` root run on all platforms; those in `darwin/` or `linux/` subdirs run only on that platform.
-- `.chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl` — installs Homebrew packages/casks (macOS only)
-- `.chezmoiscripts/linux/` — parallel installs for Linux (apt-based, Parrot OS, arm64)
+- `.chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl` — installs Homebrew packages/casks (macOS only). Puts `brew` on `PATH` itself via a prefix-detection loop: `chezmoi apply` is not an interactive zsh, so it does not inherit what `homebrew/homebrew.zsh` sets, and on Apple Silicon `/opt/homebrew/bin` is not on the default `PATH`. It also exports `HOMEBREW_CASK_OPTS` (mirroring `homebrew/exports.zsh`) so apply-time cask installs get `--appdir=~/Applications` and `--require-sha`. Casks that upstream ships as `sha256 :no_check` cannot satisfy `--require-sha`, so they live in a separate `$casks_no_sha` list installed in a second pass with that flag dropped — keep that list as short as possible.
+- `.chezmoiscripts/linux/` — parallel installs for Linux (apt-based, arm64)
 - `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl` — symlinks Zed's CLI into `~/.local/bin/zed` (every apply, macOS only)
 - `.chezmoiscripts/darwin/run_after_25_tailscale_cli.sh.tmpl` — puts Tailscale.app's CLI on `PATH` as `~/.local/bin/tailscale` via a small `exec` wrapper (not a symlink — the standalone Tailscale binary resolves its `.app` bundle from its launch path and panics through a symlink) (every apply, macOS only; no-op when Tailscale isn't installed)
 - `.chezmoiscripts/run_after_30_asdf_completions.sh` — generates asdf zsh completions into `~/.asdf/completions` (every apply)
@@ -53,6 +59,15 @@ Scripts in `.chezmoiscripts/` root run on all platforms; those in `darwin/` or `
 ### External dependencies (`.chezmoiexternal.yaml`)
 Chezmoi fetches these automatically (weekly refresh): vim-plug, zsh plugins (pure, autosuggestions, completions, history-substring-search, syntax-highlighting, zsh-z), and tmux plugins (tpm, resurrect, continuum, open, copycat, yank, themepack). They land in `~/.vim/`, `~/.local/zsh-plugins/`, and `~/.tmux/plugins/`.
 
+**Every entry is pinned to a tag (or a commit, where upstream publishes no tags) and checksummed with `checksum.sha256`.** These files are sourced into every interactive shell and tmux session, so tracking `master` unverified meant anyone able to push to any one of those repos got automatic code execution here within the refresh period. Do not "simplify" an entry back to `master.tar.gz`.
+
+Bumping is manual — Dependabot does not read this file:
+```bash
+curl -fsSL https://github.com/<owner>/<repo>/archive/<ref>.tar.gz | shasum -a 256
+chezmoi apply --refresh-externals   # must exit 0
+```
+If *several* entries fail a checksum at once with unchanged refs, suspect GitHub regenerating its auto-archives (it has happened once, in 2023) rather than a compromise — verify, then recompute.
+
 ### Zsh loading order (`dot_zshrc`)
 1. `*/exports.zsh` files — environment variables
 2. `*/path.zsh` files — `$PATH` modifications
@@ -60,6 +75,10 @@ Chezmoi fetches these automatically (weekly refresh): vim-plug, zsh plugins (pur
 4. Plugins from `~/.local/zsh-plugins/` (order matters: syntax-highlighting before history-substring-search)
 5. All remaining `*.zsh` files in topic directories (excluding `path.zsh`, `exports.zsh`, and `prompt.zsh`, already loaded above)
 6. `~/.localrc` if present (machine-local secrets, not tracked)
+
+Completion caches live under `$XDG_CACHE_HOME/zsh/` (`zcompdump`, `zcompcache/`), not in `$HOME`. `compinit` is invoked with an explicit `-d` for that reason; if you change the path, change it in both `dot_zshrc` and `zsh/completion.zsh`.
+
+`TERM` is deliberately **not** set anywhere. Ghostty, tmux (`dot_tmux.conf` sets `tmux-256color`) and herdr each set it correctly; a blanket `export TERM=xterm-256color` used to overwrite all three. If an ssh target lacks a terminfo entry, fix it there (`infocmp -x | ssh host -- tic -x -`) or set `term =` in `dot_config/ghostty/config`.
 
 Startup performance: `dot_zshrc` defines a `cached-eval` helper that caches the output of `eval "$(cmd init ...)"` style hooks in `~/.cache/zsh/` and re-runs the command only when the tool's binary is newer than the cache (used by `atuin/atuin.zsh` and `homebrew/homebrew.zsh`). Prefer `cached-eval <cache-name> <cmd> <args...>` over `eval "$(...)"` for new integrations, zsh builtin parameters (`$OSTYPE`, `$HOST`, `$TTY`, `$commands[...]`) over `$(uname)`/`$(tty)`/`$(which ...)` forks, and chezmoi apply-time scripts over per-shell setup work.
 
@@ -72,7 +91,9 @@ Each tool/concern has its own directory with `.zsh` files:
 - `alii.zsh` — aliases
 - `*.zsh` — everything else
 
-Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`, `rust`, `system`, `vagrant`, `zsh`.
+Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`, `rust`, `system`, `zsh`.
+
+Topic files are sourced on **every** platform — the `*/*.zsh` glob in `dot_zshrc` has no OS filter. Anything platform-specific needs its own guard inside the file (`[[ $OSTYPE == darwin* ]] || return 0` in `macos/alii.zsh`, `$HOST` matching in `kali/path.zsh`).
 
 ### `bin/` scripts
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
@@ -80,28 +101,39 @@ Custom executables that run in-place from the chezmoi source directory. `system/
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
 - `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`)
 - `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)
-- `enum`, `makeEnv` — misc utilities
+- `enum`, `makeEnv` — misc utilities (Linux/Kali oriented)
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
 - `ps*.ps1` — PowerShell helpers (Base64 encode, reverse shell scaffold)
 - `time-startup` — times 10 interactive zsh startups
 - `update-discord` — downloads and installs the latest Discord .deb (Linux)
 
-### Unmanaged directories
-All directories without a `dot_`, `run_`, or `empty_` prefix are unmanaged — chezmoi never applies them to `$HOME`. They are listed in `.chezmoiignore` to suppress warnings.
+### Repository layout — this is a deliberate two-mode design, not a half-finished migration
 
-**Topic directories** — contain `.zsh` files sourced directly from the chezmoi source directory by `dot_zshrc` (see Zsh loading order above). None are applied to `$HOME` by chezmoi.
-`asdf/`, `atuin/`, `fzf/`, `git/`, `gpg/`, `homebrew/`, `kali/`, `macos/`, `rust/`, `system/`, `vagrant/`, `zsh/`
+The tree mixes chezmoi-native entries with Holman-style topical directories **on purpose**. Do not "finish the migration" by converting one into the other.
 
-**Tooling/meta:**
-- `.claude/` — Claude Code config (this directory)
-- `.github/` — GitHub Actions CI workflows
-- `.vscode/` — VS Code workspace settings
-- `scripts/` — bootstrap and install scripts
+**The rule for new config:**
+- Does it have to exist as a file in `$HOME` for some other program to read? → chezmoi-native: `dot_foo`, `dot_config/foo/`, `*.tmpl`.
+- Is it only ever read by an interactive zsh, or executed by you from `$PATH`? → a topic directory or `bin/`, sourced/executed **in place** out of `$DOTFILES`.
 
-**App configs** (installed manually or via their own install scripts):
-- `bin/` — custom executables (see bin/ scripts above)
-- `iterm2/` — iTerm2 plist + `install.sh`
-- `terminal/` — macOS Terminal.app profiles (MATE, Monokai)
+Everything in the second group is listed in `.chezmoiignore` so chezmoi never copies it to `$HOME`. That is load-bearing, not cleanup debt: `dot_zshrc` sources `$DOTFILES/*/*.zsh` directly from the source directory, and `system/path.zsh` puts `$DOTFILES/bin` on `$PATH`. The upside is that editing a topic file or a `bin/` script takes effect in the next shell with no `chezmoi apply`; the tradeoff is that those files are invisible to `chezmoi diff`/`status`, so mistakes in them surface at shell startup rather than at apply time.
+
+**Unmanaged (in `.chezmoiignore`):**
+- Topic directories sourced in place: `asdf/`, `atuin/`, `fzf/`, `git/`, `gpg/`, `homebrew/`, `kali/`, `macos/`, `rust/`, `system/`, `zsh/`
+- `bin/` — executables put on `$PATH` in place
+- `terminal/` — **hand-applied** terminal profiles, see below
+- `.claude/`, `.github/`, `.vscode/`, `scripts/`, `install.sh`, and the docs
+
+### Hand-applied config — do not judge these by "is anything referencing it?"
+
+Some files here are reference material that a human imports by hand. Nothing in the repo invokes them, so a grep for references finds nothing and they *look* dead. They are not. Before deleting anything on "unreferenced" grounds, check whether it belongs in this category — a repo-wide grep cannot distinguish "dead" from "applied manually".
+
+- `terminal/MATE.terminal` — a **dconf dump** (starts `[global]`), for the MATE/GNOME terminal on Linux desktops:
+  ```bash
+  dconf load /org/mate/terminal/ < terminal/MATE.terminal
+  ```
+- `terminal/Monokai.terminal` — an Apple **plist**, a profile for macOS's native Terminal.app. Import via Terminal → Settings → Profiles → Import, or `open terminal/Monokai.terminal`.
+
+Both are live. `MATE.terminal` was previously *also* loaded automatically by the Parrot bootstrap script; retiring Parrot removed that one automated caller but not the file's purpose.
 
 Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`. `dot_config/herdr/config.toml` (managed by chezmoi) is herdr's config, applied to `~/.config/herdr/config.toml`.
 
@@ -118,4 +150,18 @@ Two gitignore files coexist in this repo. `dot_gitignore` is managed by chezmoi 
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yaml`) runs `scripts/install_dotfiles.sh` on both `macos-latest` and `ubuntu-latest` on every push/PR to master. The non-interactive defaults (`install_mac_apps: true`, etc.) are intentional for CI coverage.
+`.github/workflows/ci.yaml` has four jobs. The non-interactive template defaults (`install_mac_apps: true`, etc.) are intentional for CI coverage.
+
+| Job | Runs on | What it gates |
+|-----|---------|---------------|
+| `lint` | ubuntu | `shellcheck` over `install.sh`, `scripts/*.sh`, `bin/*` (selected by shebang, so `.ps1` and the zsh script are skipped), plus every `.chezmoiscripts/**/*.tmpl` rendered through `chezmoi execute-template` first. Strict — the tree was clean when this landed, so a new finding is a regression. |
+| `secrets` | ubuntu | `gitleaks` over full history (`fetch-depth: 0`). |
+| `apply` | macos + ubuntu | Copies **the checkout** into `~/.local/share/chezmoi` and runs `install.sh`, then applies a second time and asserts no drift. |
+| `bootstrap` | macos + ubuntu | Push-only. Tests the documented `curl \| bash` path, which necessarily clones `master` from GitHub, so it can only be meaningful post-merge. Needs `DOTFILES_FORCE_RESET=1`. |
+
+Two things worth preserving:
+
+- **`apply` tests the checkout, not the remote.** It used to run `install_dotfiles.sh`, which clones `master` from GitHub and discards `actions/checkout` output entirely — so pull requests never tested their own code and fork PRs silently validated `master`.
+- **The drift gate is `chezmoi status --exclude=scripts`, not `chezmoi verify`.** The four plain `run_after_` scripts are meant to run on every apply, so they are permanently "pending" and bare `chezmoi verify` can never exit 0.
+
+CI cannot catch macOS-Homebrew-on-`PATH` bugs: GitHub's macOS runners ship Homebrew already on `PATH`, which is exactly why the Apple Silicon bootstrap could break undetected. Test that on a real clean machine or VM.

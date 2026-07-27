@@ -16,10 +16,8 @@ arm64_packages=(
     "box64"
 )
 
-# Loop through the array and install each package
-for arm64_package in "${arm64_packages[@]}"; do
-    echo "Installing $arm64_package..."
-    sudo apt install -y $arm64_package
-done
+# Single transaction, matching run_onchange_before_10_installs.sh.tmpl.
+echo "Installing packages: ${arm64_packages[*]}"
+sudo apt install -y "${arm64_packages[@]}"
 
 {{- end -}}

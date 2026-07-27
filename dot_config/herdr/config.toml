@@ -1,3 +1,8 @@
+# herdr writes this key itself after the first run. Declaring it here keeps
+# chezmoi and herdr from fighting over the file -- without it `chezmoi status`
+# reports permanent drift and `chezmoi apply` stops to ask about it.
+onboarding = false
+
 # herdr configuration — applied to ~/.config/herdr/config.toml by chezmoi
 #
 # This file is intentionally kept aligned with the tmux config (dot_tmux.conf

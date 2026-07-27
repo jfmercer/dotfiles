@@ -1,23 +1,36 @@
+# Everything here lives in the chezmoi source directory but is deliberately NOT
+# applied to $HOME. See CLAUDE.md ("Repository layout") for why.
+#
+# The topical *.zsh directories are sourced in place out of $DOTFILES by
+# dot_zshrc, and bin/ is put on $PATH by system/path.zsh -- so they must exist
+# here but must not be copied into $HOME.
+
+# Docs and repo metadata
 CLAUDE.md
 LICENSE.md
 README.md
 .claude/
 .github/
 .vscode/
+install.sh
+scripts/
+
+# Topic directories sourced in place by dot_zshrc
 asdf/
 atuin/
-bin/
 fzf/
 git/
 gpg/
 homebrew/
-iterm2/
 kali/
 macos/
 rust/
-scripts/
 system/
-terminal/
-vagrant/
 zsh/
-install.sh
+
+# Executables put on $PATH in place by system/path.zsh
+bin/
+
+# Hand-applied terminal profiles (dconf dump / Terminal.app plist). Reference
+# material imported manually -- see CLAUDE.md. Not applied to $HOME.
+terminal/

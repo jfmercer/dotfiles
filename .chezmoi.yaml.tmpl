@@ -1,12 +1,17 @@
 {{- $interactive := stdinIsATTY -}}
 
 {{- $email := "jfmercer@protonmail.com" -}}
-# These default to true--sign--so that they can be tested in CI.
+{{/* NOTE: comment with Go template comments here, never with a bare `#`.
+     A `#` comment is emitted verbatim into the rendered YAML, and the
+     surrounding whitespace-stripping delimiters swallow its newline -- which is
+     how `verbose: true` below spent a long time sitting inside a comment and
+     never taking effect. */}}
+{{/* These default to true--sign--so that they can be tested in CI. */}}
 {{- $install_mac_apps := true -}}
 {{- $install_linux_apps := true -}}
 {{- $set_git_to_ssh := true -}}
-# Work-only git config (e.g. the Hagerty Azure DevOps URL rewrite). Defaults false
-# so personal machines and CI never get it; set true only on work machines.
+{{/* Work-only git config, pulled in from an untracked ~/.gitconfig.work.
+     Defaults false so personal machines and CI never get it. */}}
 {{- $work := false -}}
 
 {{- if $interactive -}}

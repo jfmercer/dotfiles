@@ -13,7 +13,9 @@ sudo nmap -v -sS -Pn -n --top-ports 1000 -oA top-1000 "$RHOST"
 echo "creating TCP open port list"
 sudo nmap -p- --min-rate=1000 -T4 "$RHOST" | grep '^[0-9]' | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$// > open_ports.txt
 
-sed -i 's/,/, /g' open_ports.txt
+# `sed -i` without a suffix is GNU-only; BSD sed (macOS) reads the next arg as a
+# backup suffix and then fails. Write to a temp file instead -- portable to both.
+sed 's/,/, /g' open_ports.txt > open_ports.txt.tmp && mv open_ports.txt.tmp open_ports.txt
 
 echo "nmap: slow scanning open TCP ports"
 sudo nmap -v -p "$(cat open_ports.txt)" -A -oA all-tcp "$RHOST"

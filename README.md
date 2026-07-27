@@ -23,12 +23,25 @@ It supports some environment variables:
 - `DOTFILES_REPO_HOST`: Defaults to `https://github.com`.
 - `DOTFILES_USER`: Defaults to `jfmercer`.
 - `DOTFILES_BRANCH`: Defaults to `master`.
+- `DOTFILES_FORCE_RESET`: Unset by default. When the source directory already exists, the installer does a fast-forward-only pull and **refuses to run if there are local changes**. Set this to `1` to discard local commits and untracked files instead (`git reset --hard` + `git clean -fdx`). Used by CI, which wants a clean slate.
 
 For example, you can use it to clone and install the dotfiles repository at the `beta` branch with:
 
 ```console
 DOTFILES_BRANCH=foobar /usr/bin/env bash -c "$(curl -fsSL https://raw.githubusercontent.com/jfmercer/dotfiles/master/scripts/install_dotfiles.sh)"
 ```
+
+## What the install command trusts
+
+The `curl | bash` one-liner above executes code fetched over the network before you have read it. Specifically it trusts:
+
+- `raw.githubusercontent.com` to serve an honest `scripts/install_dotfiles.sh`,
+- `get.chezmoi.io` to serve an honest chezmoi installer — the version it installs is pinned in `install.sh`, so a compromised endpoint cannot silently substitute a different chezmoi, but the installer script itself is unpinned,
+- Homebrew's `install.sh` from `HEAD` (macOS only).
+
+Everything downstream of that *is* pinned and verified: all `.chezmoiexternal.yaml` entries carry a `checksum.sha256`, and the Linux install script verifies rustup's installer checksum, lazygit's release checksum, and the eza signing key's fingerprint before using any of them.
+
+If that residual trust is not acceptable, clone the repo over SSH and run `./install.sh` directly instead of piping anything into a shell.
 
 ## Troubleshooting
 
@@ -41,9 +54,10 @@ Add `DOTFILES_DEBUG=true` to get debug output during the installation.
 * `ESC` is now `jk`. This will save your left pinky from a premature death.
 * `F2` toggles paste.
 * `F3` toggles NERDTree.
-* `F4` toggles tagbar.
 * `,ev` edits your vimrc. The mnemonic is 'e'dit 'v'imrc.
 * `,sv` sources your vimrc. The mnemonic is 's'ource 'v'imrc.
+
+Vim here is for quick terminal edits; project work happens in Zed (`c` / `erc`).
 
 ### Plugins
 
@@ -56,10 +70,6 @@ Use `cs`, `ds`, `ys`, & `yss`. See [the documentation](https://github.com/tpope/
 A file tree explorer. Basically, the project drawer you may be missing from Textmate and Sublime Text.
 ##### [NERD Commenter](https://github.com/scrooloose/nerdcommenter)
 This makes commenting much easier. Select something, `[count]<leader>cc`, done.
-##### [Tagbar](https://github.com/majutsushi/tagbar)
-Tagbar is for browsing the tags of source code files. It needs to have [Exuberant ctags](http://ctags.sourceforge.net/) installed in order to work.
-##### [Syntastic](https://github.com/scrooloose/syntastic)
-Syntastic brings syntax checking to vim. As soon as you save a file, syntastic will check it for syntax errors and list them on the left-hand column. Note that it works with supported syntax checks, and if these are not installed, it won't work. For example, for Python, you need to have `flake8`, `pyflakes`, or `pylint` in your `$PATH`. Jump between errors with `:lnext` and `:lprev`.
 ##### [Easy Motion](https://github.com/Lokaltog/vim-easymotion)
 Easy Motion makes it much, much easier to move the cursor around the screen. See @Lokaltog's [introduction](https://github.com/Lokaltog/vim-easymotion#introduction) for details. The short version: hit `<Leader><Leader>` followed by a motion key (say, `<Leader><Leader>w`) and then watch the magic happen.
 ##### [vim-airline](https://github.com/bling/vim-airline)

@@ -1,4 +1,4 @@
-name: 'Test dotfiles install'
+name: 'CI'
 
 on:
   push:
@@ -14,14 +14,128 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  # Lint the shell we own. Deliberately strict: the tree is clean at the time
+  # this was added, so any new finding is a regression.
+  # Matrixed over both OSes on purpose: .chezmoiscripts/{darwin,linux}/ templates
+  # render to an empty string on the other platform and are skipped, so a
+  # single-OS lint job would silently never check half of them.
+  lint:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
-      - name: Echo branch name
-        run: echo "GITHUB_HEAD_REF is $GITHUB_HEAD_REF"
-      - name: Test dotfiles installation
-        run: DOTFILES_BRANCH=$GITHUB_HEAD_REF bash scripts/install_dotfiles.sh
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install shellcheck
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install shellcheck
+          else
+            sudo apt-get update && sudo apt-get install -y shellcheck
+          fi
+
+      - name: Shellcheck plain scripts
+        run: |
+          # Select by shebang so .ps1 (pwsh) and bin/time-startup (zsh) are skipped.
+          # .chezmoiscripts/*.sh are included: the non-template scripts there are
+          # ordinary shell and would otherwise fall through both this glob and the
+          # rendered-template step below.
+          for f in install.sh scripts/*.sh bin/* .chezmoiscripts/*.sh; do
+            [ -f "$f" ] || continue
+            head -1 "$f" | grep -qE '^#!.*(/bash|/sh| bash| sh)$' && printf '%s\0' "$f"
+          done > /tmp/shfiles
+          echo "Linting:"; tr '\0' '\n' < /tmp/shfiles | sed 's/^/  /'
+          xargs -0 --no-run-if-empty shellcheck < /tmp/shfiles
+
+      - name: Shellcheck rendered chezmoi scripts
+        run: |
+          # .chezmoiscripts/** are Go templates, so they must be rendered before
+          # they are valid shell. Use the non-interactive template defaults.
+          sh -c "$(curl -fsSL https://get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          export PATH="$HOME/.local/bin:$PATH"
+          chezmoi init --source="$PWD"
+          rc=0
+          # NB: `find | while read` would run the loop in a subshell and throw
+          # away rc. Redirect instead.
+          while read -r tmpl; do
+            out="/tmp/$(echo "$tmpl" | tr '/' '_').sh"
+            chezmoi execute-template < "$tmpl" > "$out"
+            # Renders empty on the other platform; the matching matrix leg lints it.
+            if [ ! -s "$out" ]; then echo "skip (empty on $RUNNER_OS): $tmpl"; continue; fi
+            echo "== $tmpl"
+            shellcheck "$out" || rc=1
+          done < <(find .chezmoiscripts -name '*.tmpl')
+          exit $rc
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          # gitleaks needs history, not just the tip commit.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Apply the tree from THIS commit. Previously this job cloned master from
+  # GitHub and discarded the checkout, so pull requests never tested their own
+  # code.
+  apply:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Stage the checkout as the chezmoi source directory
+        run: |
+          mkdir -p "$HOME/.local/share"
+          cp -R "$GITHUB_WORKSPACE" "$HOME/.local/share/chezmoi"
+
+      - name: Install and apply
+        # Invoked directly, not via `bash <path>`: install.sh locates its own
+        # source directory with `command -v -- "$0"`, which only resolves an
+        # absolute path when the file is executable. This matches how
+        # scripts/install_dotfiles.sh execs it.
+        run: "$HOME/.local/share/chezmoi/install.sh"
+
+      - name: Apply a second time (idempotence)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          chezmoi apply
+
+      - name: Verify no drift
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          # Not `chezmoi verify`: the four plain run_after_ scripts are meant to
+          # run on every apply, so they are permanently "pending" and verify can
+          # never exit 0. Assert instead that no managed *file* differs from its
+          # target after two applies -- which is what idempotence means here.
+          drift=$(chezmoi status --exclude=scripts)
+          if [ -n "$drift" ]; then
+            echo "Drift after second apply:"
+            echo "$drift"
+            exit 1
+          fi
+          echo "No drift."
+
+  # The README tells people to pipe scripts/install_dotfiles.sh into bash. That
+  # path clones master from GitHub, so it can only be tested after a merge --
+  # hence push-only. DOTFILES_FORCE_RESET is required because the runner has no
+  # pre-existing source dir to preserve and we want the clean-slate behaviour.
+  bootstrap:
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Test the documented curl | bash bootstrap
+        run: DOTFILES_FORCE_RESET=1 bash scripts/install_dotfiles.sh

@@ -17,7 +17,6 @@ packages=(
     "bat"
     "colordiff"
     "direnv"
-    "expect" # needed to set shell on Parrot
     "fd-find"
     "fzf"
     "gh"
@@ -27,6 +26,11 @@ packages=(
     "htop"
     "jq"
     "less"
+    # Extended terminfo database. ncurses-base (always present) has xterm and
+    # xterm-256color but NOT tmux-256color, which dot_tmux.conf sets as
+    # default-terminal, nor screen-256color/alacritty/xterm-ghostty. Without
+    # this, anything running inside tmux gets an unknown TERM.
+    "ncurses-term"
     "nmap"
     "pipx"
     "shellcheck"
@@ -43,7 +47,6 @@ packages=(
 
 # security only packages - kali only
 # this separate list helps with Github CI to pass
-# not doing this on parrot because all it does is complain
 {{ if eq .osid "linux-kali" }}
 
 sec_packages=(
@@ -115,11 +118,38 @@ fi
 
 {{ end }}
 
+# Pinned upstream versions. Bump deliberately; see the bump recipes beside each.
+# A GPG *public key* fingerprint. Published by upstream for exactly this
+# purpose, so it is deliberately in the clear -- gitleaks' generic-api-key rule
+# only flags it because the name contains "KEY" and the value is high-entropy.
+EZA_KEY_FPR="1548BC8A4B4D2688F9B0DAF7EC29E2090CE3FD43" # gitleaks:allow
+RUSTUP_INIT_SHA256="6c30b75a75b28a96fd913a037c8581b580080b6ee9b8169a3c0feb1af7fe8caf"
+LAZYGIT_VERSION="0.63.1"
+
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
 # only set up the apt repo once; re-running is a no-op
 if [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
     sudo mkdir -p /etc/apt/keyrings
-    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    # Verify the signing key's fingerprint before trusting it. Without this we
+    # would import whatever raw.githubusercontent.com happened to return and
+    # then trust an apt repo signed by it.
+    # Bump: curl -fsSL <deb.asc url> | gpg --show-keys --with-colons | awk -F: '/^fpr:/{print $10}'
+    keyfile=$(mktemp)
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc > "$keyfile"
+    got_fpr=$(gpg --show-keys --with-colons "$keyfile" | awk -F: '/^fpr:/{print $10; exit}')
+    if [ "$got_fpr" != "$EZA_KEY_FPR" ]; then
+        echo "eza signing key fingerprint mismatch!" >&2
+        echo "  expected: $EZA_KEY_FPR" >&2
+        echo "  got:      $got_fpr" >&2
+        rm -f "$keyfile"
+        exit 1
+    fi
+    # Dearmor as the normal user and pipe into `tee` for the privileged write,
+    # rather than `sudo gpg ... < "$keyfile"` -- sudo does not apply to the
+    # shell's redirect, so that form mixes privilege levels confusingly
+    # (shellcheck SC2024).
+    gpg --dearmor < "$keyfile" | sudo tee /etc/apt/keyrings/gierens.gpg > /dev/null
+    rm -f "$keyfile"
     echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
     sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
     sudo apt update
@@ -129,22 +159,50 @@ sudo apt install -y eza
 ### RUST INSTALLS
 
 # noninteractive rust install (needed for delta)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# Download-then-verify rather than curl | sh, so a tampered installer cannot
+# execute before we have looked at it.
+# Bump (Linux): curl -fsSL https://sh.rustup.rs | sha256sum
+#       (macOS): curl -fsSL https://sh.rustup.rs | shasum -a 256
+# NB: sha256sum, not shasum -- this script is Debian-only and sha256sum comes
+# from coreutils (Essential), whereas shasum ships in the non-Essential `perl`
+# package and can be missing on a minimal install.
+rustup_init=$(mktemp)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$rustup_init"
+echo "${RUSTUP_INIT_SHA256}  ${rustup_init}" | sha256sum -c - || {
+    echo "rustup-init.sh checksum mismatch -- refusing to run it." >&2
+    echo "If upstream legitimately changed it, recompute and bump RUSTUP_INIT_SHA256." >&2
+    rm -f "$rustup_init"
+    exit 1
+}
+sh "$rustup_init" -y
+rm -f "$rustup_init"
+# shellcheck source=/dev/null
 source "$HOME/.cargo/env"
 
 # install delta
 cargo install git-delta
 
 # install lazygit
-LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+# Pinned: "latest" meant a silent, unreviewed binary swap on every fresh install.
+# Bump: gh api repos/jesseduffield/lazygit/releases/latest --jq .tag_name
 if [[ $(arch) == "x86_64" ]]; then
-  curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+  LAZYGIT_ARCH="x86_64"
 else
-  curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz"
+  LAZYGIT_ARCH="arm64"
 fi
+# Lowercase "linux" -- that is the real asset name. GitHub's download endpoint
+# resolves the URL case-insensitively, which is why the old capital-L URL
+# appeared to work, but `grep` against checksums.txt does not: a capital L
+# matches nothing there and aborts the script under `set -o pipefail`.
+LAZYGIT_TARBALL="lazygit_${LAZYGIT_VERSION}_linux_${LAZYGIT_ARCH}.tar.gz"
+LAZYGIT_BASE="https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}"
+curl -fLo lazygit.tar.gz "${LAZYGIT_BASE}/${LAZYGIT_TARBALL}"
+# Upstream publishes checksums.txt per release; verify against it.
+curl -fLo lazygit-checksums.txt "${LAZYGIT_BASE}/checksums.txt"
+grep " ${LAZYGIT_TARBALL}\$" lazygit-checksums.txt | sed "s|${LAZYGIT_TARBALL}|lazygit.tar.gz|" | sha256sum -c -
 tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
-sudo rm -rf "$HOME"/lazygit*
+rm -f lazygit.tar.gz lazygit-checksums.txt lazygit
 
 # navi
 cargo install --locked navi

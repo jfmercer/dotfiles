@@ -1,2 +1,4 @@
-# This is created dynamically on Linux at install time
+# Left behind on Linux boxes by the retired
+# run_onchange_before_30_linux_aliases.sh script; those aliases now live in
+# system/alii.zsh behind an $OSTYPE guard. Safe to delete on those machines.
 system/linux.zsh

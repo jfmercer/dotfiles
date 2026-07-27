@@ -20,13 +20,11 @@ autocmd VimEnter * if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
 " ================ Load vim plugins ===================================
 call plug#begin('~/.vim/plugged')
 
-Plug 'majutsushi/tagbar'
 Plug 'Lokaltog/vim-easymotion'
 Plug 'luochen1990/rainbow'
 Plug 'Raimondi/delimitMate'
 Plug 'scrooloose/nerdcommenter'
 Plug 'scrooloose/nerdtree'
-" Plug 'scrooloose/syntastic'
 Plug 'sickill/vim-monokai'
 Plug 'tpope/vim-fugitive'
 Plug 'tpope/vim-surround'
@@ -197,7 +195,6 @@ cnoremap <expr> %% getcmdtype() == ':' ? expand('%:h').'/' : '%%'
 " Function Keys
 set pastetoggle=<F2>                " Toggle paste function for clipboard pasting
 nnoremap <F3> :NERDTreeToggle<CR>   " Toggle NERDTree
-nnoremap <F4> :TagbarToggle<CR>     " Toggle tagbar
 
 " Disable Arrow Keys
 inoremap  <Up>     <NOP>
@@ -285,25 +282,6 @@ if !exists('g:airline_symbols')            " Helps with powerline font rendering
   let g:airline_symbols = {}
 endif
 let g:airline_symbols.space = "\ua0"
-
-" ================ Syntastic Settings =========================================
-
-" set statusline+=%#warningmsg#
-" set statusline+=%{SyntasticStatuslineFlag()}
-" set statusline+=%*
-
-" let g:syntastic_always_populate_loc_list = 1
-" let g:syntastic_auto_loc_list = 1
-" let g:syntastic_check_on_open = 1
-" let g:syntastic_check_on_wq = 0
-
-" Custom file checker configurations
-" Cf. https://github.com/scrooloose/syntastic/wiki/Syntax-Checkers
-" let g:syntastic_php_checkers = [] " Disables checking of php files
-" let g:syntastic_php_checkers = ["php", "phpcs", "phpmd"] " Activate php, phpcs, & phpmd
-
-" Get information about current buffer
-" :SyntasticInfo
 
 " ================ vimscript functions =========================================
 
