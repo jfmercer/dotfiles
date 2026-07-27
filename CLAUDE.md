@@ -99,7 +99,7 @@ Topic files are sourced on **every** platform — the `*/*.zsh` glob in `dot_zsh
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
 - `bupdate` — `brew update && brew upgrade && brew cleanup`
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
-- `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`)
+- `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`). Also provides the **env bundle** (`env` / `env-edit` / `env-import`) — see below.
 - `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)
 - `enum`, `makeEnv` — misc utilities (Linux/Kali oriented)
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
@@ -136,6 +136,50 @@ Some files here are reference material that a human imports by hand. Nothing in 
 Both are live. `MATE.terminal` was previously *also* loaded automatically by the Parrot bootstrap script; retiring Parrot removed that one automated caller but not the file's purpose.
 
 Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`. `dot_config/herdr/config.toml` (managed by chezmoi) is herdr's config, applied to `~/.config/herdr/config.toml`.
+
+### Secrets and shell startup: the `secret` env bundle
+
+`~/.localrc` (untracked, machine-local) is where API tokens get exported. The
+obvious way to write it is one Keychain lookup per variable:
+
+```zsh
+export SNYK_TOKEN=$(secret get snyk_api_key)     # ~48 ms, every shell
+```
+
+**Each of those costs a full Keychain round trip — measured at ~48 ms.** Ten of
+them is ~480 ms added to *every* interactive shell, which was ~78% of total
+startup. `zprof` does not reveal this: the cost is forks from a sourced file,
+not time in shell functions.
+
+Use the bundle instead. Every value still lives only in the Keychain, but in a
+single item, so the shell pays one read:
+
+```zsh
+eval "$(secret env)"                              # in ~/.localrc
+```
+
+Measured over 10 variables: **~590 ms → ~90 ms.**
+
+Managing it:
+
+```bash
+secret env-edit                                          # edit in $EDITOR
+printf 'SNYK_TOKEN=snyk_api_key\n' | secret env-import   # build from existing items
+secret env                                               # print it (what eval consumes)
+```
+
+The item is `$SECRET_ENV_NAME` (default `shell_env`), holding base64 of a block
+of `export VAR='value'` lines — base64 because `security add-generic-password`
+takes the value as an argument rather than on stdin. Values touch disk only as
+a mode-0600 temp file during `env-edit`, removed on exit.
+
+Two rules for `~/.localrc`, since it runs on every interactive shell:
+
+- Never put a literal secret in it. Sensitive values belong in the Keychain and
+  come back through the bundle.
+- Watch per-line forks generally, not just Keychain reads. Three
+  `ssh-add --apple-use-keychain` calls cost ~60 ms there; `AddKeysToAgent yes`
+  plus `UseKeychain yes` in `~/.ssh/config` achieves the same thing lazily.
 
 ### tmux / herdr alignment
 `dot_tmux.conf` and `dot_config/herdr/config.toml` are intentionally kept aligned (same Ctrl-a prefix, `|`/`-` split keys, vi copy mode, session-persistence behavior). When changing a setting in one, mirror the equivalent setting in the other — the tmux↔herdr mapping lives as comments in `dot_config/herdr/config.toml`.
