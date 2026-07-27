@@ -75,7 +75,13 @@ jobs:
             out="/tmp/$(echo "$tmpl" | tr '/' '_').sh"
             chezmoi execute-template < "$tmpl" > "$out"
             # Renders empty on the other platform; the matching matrix leg lints it.
-            if [ ! -s "$out" ]; then echo "skip (empty on $RUNNER_OS): $tmpl"; continue; fi
+            # Test for no non-whitespace content rather than `[ -s ]`: a template
+            # whose guard closes with `{{ end }}` instead of `{{- end -}}` emits a
+            # lone newline, which is 1 byte and would otherwise be linted as a
+            # shell script with no shebang.
+            if [ -z "$(tr -d '[:space:]' < "$out")" ]; then
+              echo "skip (empty on $RUNNER_OS): $tmpl"; continue
+            fi
             echo "== $tmpl"
             shellcheck "$out" || rc=1
           done < <(find .chezmoiscripts -name '*.tmpl')
