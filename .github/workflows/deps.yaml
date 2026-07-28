@@ -1,0 +1,100 @@
+name: 'Dependency staleness'
+
+# Pins live in four files with no shared mechanism and Dependabot reads none of
+# them, so nothing would otherwise tell us they have drifted. This reports; it
+# never commits. Bumping stays a deliberate act (`bin/bump-deps --apply`),
+# because bumping the externals pulls upstream code that gets sourced into every
+# interactive shell and tmux session.
+on:
+  schedule:
+    # Mondays, 08:00 UTC. Cron in GitHub Actions is best-effort, not punctual.
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Check pins
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python3 bin/bump-deps --check > /tmp/report.txt 2>&1
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          cat /tmp/report.txt
+          # Flag security-relevant classes separately: a rotated GPG fingerprint
+          # or a rewritten unversioned installer is not a routine update.
+          if grep -qE '^(ROTATED|CHANGED):' /tmp/report.txt; then
+            echo "security=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update the tracking issue
+        if: steps.check.outputs.rc != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SECURITY: ${{ steps.check.outputs.security }}
+        run: |
+          if [ "$SECURITY" = "true" ]; then
+            title="Dependency check: integrity pin changed — review before bumping"
+          else
+            title="Dependency check: pins are stale"
+          fi
+
+          {
+            echo "\`bin/bump-deps --check\` reported work to do on $(date -u +%Y-%m-%d)."
+            echo
+            echo '```'
+            cat /tmp/report.txt
+            echo '```'
+            echo
+            if [ "$SECURITY" = "true" ]; then
+              echo '> **A CONTENT or ANCHOR pin changed.** These are not version bumps.'
+              echo '> An `ANCHOR` line means a GPG public-key fingerprint no longer matches:'
+              echo '> either upstream rotated the key, or something is wrong. Verify against'
+              echo '> the project'"'"'s own announcement before touching the pin. `bump-deps`'
+              echo '> deliberately refuses to rewrite it.'
+              echo
+            fi
+            echo 'To act on this:'
+            echo
+            echo '```bash'
+            echo 'bump-deps            # full table'
+            echo 'bump-deps --apply    # bump versions; confirm each external'
+            echo '```'
+            echo
+            echo "_Updated by \`.github/workflows/deps.yaml\`._"
+          } > /tmp/body.md
+
+          # Reuse one issue rather than opening a new one every week.
+          existing=$(gh issue list --state open --label dependencies \
+                       --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+            gh issue edit "$existing" --title "$title" --body-file /tmp/body.md
+            echo "updated issue #$existing"
+          else
+            gh label create dependencies --color 0366d6 \
+              --description "Pinned dependency drift" 2>/dev/null || true
+            gh issue create --title "$title" --body-file /tmp/body.md --label dependencies
+          fi
+
+      - name: Close the tracking issue when everything is current
+        if: steps.check.outputs.rc == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --state open --label dependencies \
+                       --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+            gh issue close "$existing" --comment "All pins current; closing."
+            echo "closed issue #$existing"
+          else
+            echo "all pins current, no open issue"
+          fi

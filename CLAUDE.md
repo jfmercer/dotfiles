@@ -59,14 +59,35 @@ Scripts in `.chezmoiscripts/` root run on all platforms; those in `darwin/` or `
 ### External dependencies (`.chezmoiexternal.yaml`)
 Chezmoi fetches these automatically (weekly refresh): vim-plug, zsh plugins (pure, autosuggestions, completions, history-substring-search, syntax-highlighting, zsh-z), and tmux plugins (tpm, resurrect, continuum, open, copycat, yank, themepack). They land in `~/.vim/`, `~/.local/zsh-plugins/`, and `~/.tmux/plugins/`.
 
-**Every entry is pinned to a tag (or a commit, where upstream publishes no tags) and checksummed with `checksum.sha256`.** These files are sourced into every interactive shell and tmux session, so tracking `master` unverified meant anyone able to push to any one of those repos got automatic code execution here within the refresh period. Do not "simplify" an entry back to `master.tar.gz`.
+**Every entry is pinned to an exact commit and checksummed with `checksum.sha256`.** These files are sourced into every interactive shell and tmux session, so tracking `master` unverified meant anyone able to push to any one of those repos got automatic code execution here within the refresh period. Do not "simplify" an entry back to `master.tar.gz`.
 
-Bumping is manual — Dependabot does not read this file:
-```bash
-curl -fsSL https://github.com/<owner>/<repo>/archive/<ref>.tar.gz | shasum -a 256
-chezmoi apply --refresh-externals   # must exit 0
-```
+Pinned to **commits, not tags**: several of these projects stopped tagging years ago while `master` kept moving (tmux-yank's newest release is from 2018, five years behind its master), so "latest tag" silently *downgrades*. A commit SHA is content-addressed, which is at least as strong as a tag — tags can be force-moved, commits cannot.
+
 If *several* entries fail a checksum at once with unchanged refs, suspect GitHub regenerating its auto-archives (it has happened once, in 2023) rather than a compromise — verify, then recompute.
+
+### Bumping pinned dependencies — `bin/bump-deps`
+
+Pins are spread across four files and Dependabot reads none of them. `bin/bump-deps` (Python 3, stdlib only, uses `gh` for the API) walks all of them:
+
+```bash
+bump-deps            # status table: class, current, latest
+bump-deps --check    # terse; exit 1 if action needed (what CI runs)
+bump-deps --apply    # bump versions; confirm each external individually
+bump-deps --self-test  # prove the in-place editing is surgical
+```
+
+**A pin is not always a version.** The tool treats four classes differently, and conflating them would be harmful:
+
+| Class | Where | Bumping means |
+|-------|-------|---------------|
+| `VERSION` | `install.sh`, `ci.yaml`, linux installs | Latest stable release. Automatic. |
+| `EXTERNAL` | `.chezmoiexternal.yaml` (14) | Move to master HEAD, recompute checksum. Confirmed per entry, because it pulls upstream code nobody has read. |
+| `CONTENT` | `RUSTUP_INIT_SHA256` | A hash over an *unversioned* URL. A change means upstream rewrote the installer — a trust decision, so it needs `--accept rustup`. |
+| `ANCHOR` | `EZA_KEY_FPR` | A GPG public-key fingerprint. **Never rewritten automatically.** A mismatch is key rotation or an attack; verify against upstream's own announcement and edit by hand. |
+
+It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and Actions pinned to a floating major tag rather than an exact release.
+
+`.github/workflows/deps.yaml` runs `--check` weekly and keeps a single tracking issue in sync. It never commits — bumping stays deliberate.
 
 ### Zsh loading order (`dot_zshrc`)
 1. `*/exports.zsh` files — environment variables
@@ -98,6 +119,7 @@ Topic files are sourced on **every** platform — the `*/*.zsh` glob in `dot_zsh
 ### `bin/` scripts
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
 - `bupdate` — `brew update && brew upgrade && brew cleanup`
+- `bump-deps` — reports and bumps every pinned dependency across the four files that hold them; the only Python script in `bin/`. See "Bumping pinned dependencies" above.
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
 - `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`). Also provides the **env bundle** (`env` / `env-edit` / `env-import`) — see below.
 - `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)

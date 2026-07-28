@@ -61,6 +61,26 @@ jobs:
           echo "Linting:"; tr '\0' '\n' < /tmp/shfiles | sed 's/^/  /'
           xargs -0 --no-run-if-empty shellcheck < /tmp/shfiles
 
+      # The shellcheck steps select files by shebang, so anything with a
+      # `#!/usr/bin/env python3` line is skipped entirely and would otherwise go
+      # unchecked. py_compile is stdlib -- no new CI dependency.
+      - name: Syntax-check Python scripts
+        run: |
+          found=0
+          for f in bin/* scripts/*; do
+            [ -f "$f" ] || continue
+            head -1 "$f" | grep -q 'python3' || continue
+            echo "  $f"
+            python3 -m py_compile "$f"
+            found=$((found + 1))
+          done
+          echo "checked $found Python script(s)"
+          # Don't leave byte-cache behind for the drift check in the apply job.
+          rm -rf bin/__pycache__ scripts/__pycache__
+
+      - name: Self-test bin/bump-deps
+        run: python3 bin/bump-deps --self-test
+
       - name: Shellcheck rendered chezmoi scripts
         run: |
           # .chezmoiscripts/** are Go templates, so they must be rendered before
@@ -94,7 +114,7 @@ jobs:
         with:
           # gitleaks needs history, not just the tip commit.
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
