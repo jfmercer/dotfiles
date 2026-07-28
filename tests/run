@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Run every test in this repo: bats for the shell, stdlib unittest for the one
+# Python script. One entry point, one exit code -- this is what CI invokes and
+# what you should run locally before pushing.
+#
+# Usage:
+#   tests/run                 everything
+#   tests/run bats            only the bats suites
+#   tests/run python          only the Python suites
+#
+# bats is located in this order: $BATS, then PATH, then tests/.bats/bin/bats
+# (an untracked local install, for machines without brew).
+
+set -eu
+
+repo="$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)"
+cd "$repo"
+
+which_suite="${1:-all}"
+
+find_bats() {
+  if [ -n "${BATS-}" ]; then
+    printf '%s' "$BATS"
+    return 0
+  fi
+  if command -v bats >/dev/null 2>&1; then
+    command -v bats
+    return 0
+  fi
+  if [ -x "tests/.bats/bin/bats" ]; then
+    printf '%s' "$repo/tests/.bats/bin/bats"
+    return 0
+  fi
+  return 1
+}
+
+rc=0
+
+if [ "$which_suite" = all ] || [ "$which_suite" = bats ]; then
+  if bats_bin="$(find_bats)"; then
+    echo "== bats ($("$bats_bin" --version))"
+    # --print-output-on-failure keeps a failing assertion's actual value in the
+    # log; without it bats reports only the failing line number.
+    "$bats_bin" --print-output-on-failure tests/bats || rc=1
+  else
+    echo "ERROR: bats not found. Install it with 'brew install bats-core', or" >&2
+    echo "       set \$BATS, or unpack bats-core into tests/.bats/." >&2
+    rc=1
+  fi
+fi
+
+if [ "$which_suite" = all ] || [ "$which_suite" = python ]; then
+  echo
+  echo "== unittest"
+  # -t tests/python (not the repo root) so the suites import as top-level
+  # modules and no __init__.py files are needed.
+  python3 -m unittest discover -s tests/python -t tests/python || rc=1
+  # py_compile in CI asserts the tree is clean afterward; don't leave cache.
+  rm -rf tests/python/__pycache__
+fi
+
+exit "$rc"

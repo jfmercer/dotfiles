@@ -83,6 +83,18 @@ VERSION_PINS = [
         "strip_v": False,
     },
     {
+        # The tarball's sha256 sits next to this in ci.yaml and is verified there
+        # at install time, so a bumped tag with a stale hash fails the job rather
+        # than silently skipping verification. That is why this is a plain VERSION
+        # pin and not a fifth pin class.
+        "name": "bats",
+        "file": CI,
+        "pattern": r"BATS_VERSION: (\S+)",
+        "repo": "bats-core/bats-core",
+        "occurrences": 1,
+        "strip_v": False,
+    },
+    {
         "name": "actions/checkout",
         "file": CI,
         "pattern": r"actions/checkout@(\S+)",

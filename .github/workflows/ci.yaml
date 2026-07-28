@@ -107,7 +107,7 @@ jobs:
           # .chezmoiscripts/*.sh are included: the non-template scripts there are
           # ordinary shell and would otherwise fall through both this glob and the
           # rendered-template step below.
-          for f in install.sh scripts/*.sh bin/* .chezmoiscripts/*.sh; do
+          for f in install.sh scripts/*.sh bin/* .chezmoiscripts/*.sh tests/run; do
             [ -f "$f" ] || continue
             head -1 "$f" | grep -qE '^#!.*(/bash|/sh| bash| sh)$' && printf '%s\0' "$f"
           done > /tmp/shfiles
@@ -159,6 +159,75 @@ jobs:
             shellcheck "$out" || rc=1
           done < <(find .chezmoiscripts -name '*.tmpl')
           exit $rc
+
+  # Behavioral tests, as opposed to the parse-only checks in `lint`. Matrixed
+  # for the same reason: bin/secret is macOS-facing but must still be provably
+  # correct when its `security` calls are stubbed, and the template suite renders
+  # the darwin and linux .chezmoiscripts templates on their respective runners.
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      # Pinned to an upstream release rather than each platform's package
+      # manager, for the same reason shellcheck is: Ubuntu's apt `bats` trails
+      # Homebrew's `bats-core` by several minor versions and they disagree about
+      # which helpers exist, so an unpinned gate passes on one runner and fails
+      # on the other for identical code.
+      #
+      # The checksum is verified rather than assumed. GitHub's source archives
+      # are generated on demand and have been regenerated once (2023), so if this
+      # ever fails with an unchanged tag, check for that before assuming the
+      # worst -- then recompute with:
+      #   curl -fsSL <url> | shasum -a 256
+      # Bump the tag with: bin/bump-deps (it is registered as a VERSION pin).
+      - name: Install bats-core
+        env:
+          BATS_VERSION: v1.14.0
+          BATS_SHA256: bb537b70b15b732f6d8827dd6578e3d8ce166636ce1f18ea9a074184fcce9177
+        run: |
+          url="https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz"
+          curl -fsSLo /tmp/bats.tar.gz "$url"
+          echo "${BATS_SHA256}  /tmp/bats.tar.gz" | shasum -a 256 -c -
+          tar -xzf /tmp/bats.tar.gz -C /tmp
+          sudo "/tmp/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
+          bats --version
+
+      - name: Install jq
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+          jq --version
+
+      # templates.bats shells out to `chezmoi execute-template`. Without chezmoi
+      # those tests skip rather than fail, which would quietly hollow out the
+      # suite -- so install it explicitly.
+      - name: Install chezmoi
+        run: |
+          sh -c "$(curl -fsSL https://get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # The suite runs once; the skip check reads its output rather than running
+      # it again. A missing jq/zsh/chezmoi makes the affected tests skip rather
+      # than fail -- deliberate, so the suite stays runnable on a half-configured
+      # laptop -- but on a runner a skip means the job silently tested less than
+      # it claims, so it is an error here.
+      - name: Run the test suite
+        run: |
+          set -o pipefail
+          ./tests/run 2>&1 | tee /tmp/testlog
+      - name: Assert nothing was skipped
+        run: |
+          if grep -E '^ok .*# skip' /tmp/testlog; then
+            echo "tests skipped above; a dependency is missing on this runner" >&2
+            exit 1
+          fi
+          echo "no skipped tests"
 
   secrets:
     runs-on: ubuntu-latest
