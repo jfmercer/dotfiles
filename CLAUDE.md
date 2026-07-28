@@ -187,7 +187,8 @@ Two rules for `~/.localrc`, since it runs on every interactive shell:
 correct for years while doing nothing; GitHub SSH only worked because the eager
 `ssh-add` had pushed the key into the agent. Removing those lines without
 fixing the pattern would have broken push access. `gitlab.com` had no
-`IdentityFile` at all, for the same hidden reason. Always verify with:
+`IdentityFile` at all, hidden the same way — that key has since been retired and
+its config block commented out, so don't go looking for it. Always verify with:
 
 ```bash
 ssh -G github.com | grep -E '^identityfile'   # must list the intended key
