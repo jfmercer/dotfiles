@@ -197,12 +197,28 @@ jobs:
           sudo "/tmp/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
           bats --version
 
-      - name: Install jq
+      # jq because herdr-reload-all's behavior largely IS its jq filters, so they
+      # are exercised for real rather than stubbed. zsh because the bundle that
+      # `secret env` produces is eval'd by zsh in actual use -- the bash leg of
+      # that round-trip does not prove the zsh leg, which is the whole reason
+      # bin/secret hand-rolls its quoting instead of using printf %q. Ubuntu
+      # runners ship neither; macOS ships both.
+      - name: Install jq and zsh
         run: |
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y jq
+          missing=""
+          for tool in jq zsh; do
+            command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+          done
+          if [ -n "$missing" ]; then
+            if [ "$RUNNER_OS" != "Linux" ]; then
+              echo "missing:$missing and no install path for $RUNNER_OS" >&2
+              exit 1
+            fi
+            # shellcheck disable=SC2086
+            sudo apt-get update && sudo apt-get install -y $missing
           fi
           jq --version
+          zsh --version
 
       # templates.bats shells out to `chezmoi execute-template`. Without chezmoi
       # those tests skip rather than fail, which would quietly hollow out the
