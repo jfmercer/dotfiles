@@ -117,12 +117,20 @@ Active topics: `asdf`, `atuin`, `fzf`, `git`, `gpg`, `homebrew`, `kali`, `macos`
 Topic files are sourced on **every** platform — the `*/*.zsh` glob in `dot_zshrc` has no OS filter. Anything platform-specific needs its own guard inside the file (`[[ $OSTYPE == darwin* ]] || return 0` in `macos/alii.zsh`, `$HOST` matching in `kali/path.zsh`).
 
 ### `bin/` scripts
+
+**Shell or Python?** Measured on this machine: `python3 -c pass` costs ~40 ms against bash's ~13 ms, and a realistic wrapper 65 ms against 26 ms — roughly 2.5× slower to start. `bin/` is on `$PATH`, so that is per-invocation.
+
+- **Shell** for thin wrappers. The `git-*` helpers are 1–13 lines each and get typed interactively all day; Python would make them slower *and* longer for nothing.
+- **Python** where there is real logic worth structuring and testing, and start-up is irrelevant because the thing is run deliberately: `bump-deps` (594 lines), `secret` (quoting-sensitive and security-relevant), `herdr-reload-all` (parses a JSON envelope and branches on it — previously three chained `jq` calls with `|| true` to keep `set -e` quiet).
+
+Anything a shell *sources* — the topic `*.zsh` files — cannot move regardless. And if a Python script ends up on the shell-startup path, inline the hot call instead of paying interpreter start (see the `~/.localrc` note under the env bundle).
+
 Custom executables that run in-place from the chezmoi source directory. `system/path.zsh` adds `$DOTFILES/bin` to `$PATH`, so nothing is copied or symlinked elsewhere. Before adding a new script, check here first:
 - `bupdate` — `brew update && brew upgrade && brew cleanup`
 - `bump-deps` — reports and bumps every pinned dependency across the four files that hold them; the only Python script in `bin/`. See "Bumping pinned dependencies" above.
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
-- `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`). Also provides the **env bundle** (`env` / `env-edit` / `env-import`) — see below.
-- `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)
+- `secret` *(Python)* — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`). Also provides the **env bundle** (`env` / `env-edit` / `env-import`) — see below.
+- `herdr-reload-all` *(Python)* — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)
 - `enum`, `makeEnv` — misc utilities (Linux/Kali oriented)
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
 - `ps*.ps1` — PowerShell helpers (Base64 encode, reverse shell scaffold)
@@ -177,7 +185,14 @@ Use the bundle instead. Every value still lives only in the Keychain, but in a
 single item, so the shell pays one read:
 
 ```zsh
-eval "$(secret env)"                              # in ~/.localrc
+eval "$(secret env)"                              # the canonical reader
+```
+
+`~/.localrc` deliberately does **not** call `secret env`. `bin/secret` is Python, and paying ~37 ms of interpreter start on every shell to read one Keychain item is not worth it, so `~/.localrc` inlines the equivalent:
+
+```zsh
+eval "$(security find-generic-password -a "${SECRET_ACCOUNT:-$USER}" \
+        -s "${SECRET_ENV_NAME:-shell_env}" -w 2>/dev/null | base64 -d)"
 ```
 
 Measured over 10 variables: **~590 ms → ~90 ms.**

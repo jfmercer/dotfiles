@@ -1,53 +1,97 @@
-#!/usr/bin/env bash
-#
-# herdr-reload-all - re-exec the login shell in every herdr shell pane at once.
-#
-# Runs the `reload` alias (exec $SHELL -l) in every herdr pane that is NOT hosting
-# an AI agent, so updated dotfiles take effect across all tabs and workspaces without
-# reloading each pane by hand. Agent panes (e.g. claude) are skipped so "reload" is
-# never typed into an agent's prompt.
-#
-# If the herdr CLI has outpaced the running server (a "protocol mismatch", common
-# after `brew upgrade herdr`), this explains how to restart the server instead of
-# failing with a raw JSON error. It never restarts the server itself: that would
-# exit every pane process, including running agents.
-#
-# Usage: herdr-reload-all
+#!/usr/bin/env python3
+"""herdr-reload-all - re-exec the login shell in every herdr shell pane at once.
 
-set -euo pipefail
-IFS=$'\n\t'
+Runs the `reload` alias (exec $SHELL -l) in every herdr pane that is NOT hosting
+an AI agent, so updated dotfiles take effect across all tabs and workspaces
+without reloading each pane by hand. Agent panes (e.g. claude) are skipped so
+"reload" is never typed into an agent's prompt.
 
-exit_with_error() {
-    echo "ERROR: $1" >&2
-    exit 1
-}
+If the herdr CLI has outpaced the running server (a "protocol mismatch", common
+after `brew upgrade herdr`), this explains how to restart the server instead of
+failing with a raw JSON error. It never restarts the server itself: that would
+exit every pane process, including running agents.
 
-command -v herdr >/dev/null 2>&1 || exit_with_error "herdr not found on PATH"
-command -v jq    >/dev/null 2>&1 || exit_with_error "jq not found on PATH"
+Python rather than shell because the whole job is parsing a JSON envelope and
+branching on it -- that was three chained `jq` invocations with `|| true` to stop
+`set -e` firing on expected misses. It is invoked by hand (the `hra` alias), so
+interpreter start-up does not matter here.
 
-# `herdr pane list` prints a JSON envelope: {"result":...} on success, or
-# {"error":{"code","message"}} on failure. After `brew upgrade herdr` bumps the CLI
-# past the still-running server, that failure is code "protocol_mismatch" -- catch it
-# and explain the fix instead of leaking raw JSON or silently reloading nothing.
-panes_json="$(herdr pane list 2>&1)" || true
+Usage: herdr-reload-all
+"""
 
-err_code="$(printf '%s' "$panes_json" | jq -r '.error.code // empty' 2>/dev/null || true)"
-case "$err_code" in
-    "") ;;  # no error envelope -- fall through to the reload
-    protocol_mismatch)
-        exit_with_error "herdr CLI is newer than the running server (protocol mismatch).
-This is expected after 'brew upgrade herdr': the on-disk binary moved ahead of the
-long-running server. Restart the server to load the new version, then re-run hra:
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import sys
+
+PROTOCOL_MISMATCH_HELP = """\
+herdr CLI is newer than the running server (protocol mismatch).
+This is expected after 'brew upgrade herdr': the on-disk binary moved ahead of
+the long-running server. Restart the server to load the new version, then re-run
+hra:
     herdr server stop && herdr
 WARNING: 'herdr server stop' exits every pane process (shells AND agents) --
-save your work first." ;;
-    *)
-        exit_with_error "herdr pane list failed ($err_code): $(printf '%s' "$panes_json" | jq -r '.error.message // .' 2>/dev/null)" ;;
-esac
+save your work first."""
 
-# Keep only non-agent (shell) panes and reload each.
-printf '%s' "$panes_json" \
-    | jq -r '.result.panes[] | select(.agent == null) | .pane_id' \
-    | while read -r pane; do
-        herdr pane run "$pane" 'reload' || echo "WARN: could not reload $pane" >&2
-    done
+
+def die(msg: str) -> None:
+    print(f"ERROR: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def main() -> int:
+    if not shutil.which("herdr"):
+        die("herdr not found on PATH")
+
+    # `herdr pane list` prints a JSON envelope: {"result": ...} on success, or
+    # {"error": {"code", "message"}} on failure. Capture both streams and ignore
+    # the exit status -- a non-zero exit still carries a useful envelope.
+    proc = subprocess.run(
+        ["herdr", "pane", "list"], capture_output=True, text=True, check=False
+    )
+    raw = (proc.stdout or "") + (proc.stderr or "")
+
+    try:
+        envelope = json.loads(raw)
+    except json.JSONDecodeError:
+        # Not JSON at all: surface what herdr actually said rather than a
+        # parser error, which tells the user nothing useful.
+        first = raw.strip().splitlines()[0] if raw.strip() else "(no output)"
+        die(f"herdr pane list did not return JSON: {first}")
+
+    error = envelope.get("error") or {}
+    code = error.get("code")
+    if code == "protocol_mismatch":
+        die(PROTOCOL_MISMATCH_HELP)
+    elif code:
+        die(f"herdr pane list failed ({code}): {error.get('message', raw.strip())}")
+
+    panes = (envelope.get("result") or {}).get("panes") or []
+    # agent is null on plain shell panes and set (e.g. "claude") on agent panes.
+    shell_panes = [p["pane_id"] for p in panes if p.get("agent") is None and p.get("pane_id")]
+
+    if not shell_panes:
+        print("No non-agent shell panes to reload.")
+        return 0
+
+    failed = 0
+    for pane in shell_panes:
+        run = subprocess.run(
+            ["herdr", "pane", "run", pane, "reload"], capture_output=True, text=True, check=False
+        )
+        if run.returncode != 0:
+            print(f"WARN: could not reload {pane}", file=sys.stderr)
+            failed += 1
+
+    reloaded = len(shell_panes) - failed
+    print(f"Reloaded {reloaded}/{len(shell_panes)} shell pane(s).")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)
