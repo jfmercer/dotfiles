@@ -22,32 +22,61 @@ exit_with_error() {
     exit 1
 }
 
-command -v herdr >/dev/null 2>&1 || exit_with_error "herdr not found on PATH"
-command -v jq    >/dev/null 2>&1 || exit_with_error "jq not found on PATH"
+main() {
+    command -v herdr >/dev/null 2>&1 || exit_with_error "herdr not found on PATH"
+    command -v jq    >/dev/null 2>&1 || exit_with_error "jq not found on PATH"
 
-# `herdr pane list` prints a JSON envelope: {"result":...} on success, or
-# {"error":{"code","message"}} on failure. After `brew upgrade herdr` bumps the CLI
-# past the still-running server, that failure is code "protocol_mismatch" -- catch it
-# and explain the fix instead of leaking raw JSON or silently reloading nothing.
-panes_json="$(herdr pane list 2>&1)" || true
+    # `herdr pane list` prints a JSON envelope: {"result":...} on success, or
+    # {"error":{"code","message"}} on failure. After `brew upgrade herdr` bumps the CLI
+    # past the still-running server, that failure is code "protocol_mismatch" -- catch it
+    # and explain the fix instead of leaking raw JSON or silently reloading nothing.
+    local panes_json err_code
+    panes_json="$(herdr pane list 2>&1)" || true
 
-err_code="$(printf '%s' "$panes_json" | jq -r '.error.code // empty' 2>/dev/null || true)"
-case "$err_code" in
-    "") ;;  # no error envelope -- fall through to the reload
-    protocol_mismatch)
-        exit_with_error "herdr CLI is newer than the running server (protocol mismatch).
+    # Reject anything that is not a result/error envelope before touching it.
+    # The `|| true` on the err_code line below only protects that one jq call: a
+    # plain-text error from `herdr pane list` used to sail past it as an empty
+    # code, then die in the reload pipeline with a raw "jq: parse error" and,
+    # under `set -o pipefail`, take the whole script with it -- exactly the
+    # leaked-internals failure the protocol_mismatch branch exists to avoid.
+    if ! printf '%s' "$panes_json" \
+        | jq -e 'type == "object" and (has("result") or has("error"))' >/dev/null 2>&1; then
+        exit_with_error "unexpected output from 'herdr pane list' -- not a JSON envelope:
+$panes_json"
+    fi
+
+    err_code="$(printf '%s' "$panes_json" | jq -r '.error.code // empty' 2>/dev/null || true)"
+    case "$err_code" in
+        "") ;;  # no error envelope -- fall through to the reload
+        protocol_mismatch)
+            exit_with_error "herdr CLI is newer than the running server (protocol mismatch).
 This is expected after 'brew upgrade herdr': the on-disk binary moved ahead of the
 long-running server. Restart the server to load the new version, then re-run hra:
     herdr server stop && herdr
 WARNING: 'herdr server stop' exits every pane process (shells AND agents) --
 save your work first." ;;
-    *)
-        exit_with_error "herdr pane list failed ($err_code): $(printf '%s' "$panes_json" | jq -r '.error.message // .' 2>/dev/null)" ;;
-esac
+        *)
+            exit_with_error "herdr pane list failed ($err_code): $(printf '%s' "$panes_json" | jq -r '.error.message // .' 2>/dev/null)" ;;
+    esac
 
-# Keep only non-agent (shell) panes and reload each.
-printf '%s' "$panes_json" \
-    | jq -r '.result.panes[] | select(.agent == null) | .pane_id' \
-    | while read -r pane; do
-        herdr pane run "$pane" 'reload' || echo "WARN: could not reload $pane" >&2
-    done
+    # Keep only non-agent (shell) panes and reload each. `// []` because a
+    # well-formed envelope with no panes key would otherwise fail with "cannot
+    # iterate over null" and, via pipefail, abort.
+    printf '%s' "$panes_json" \
+        | jq -r '(.result.panes // [])[] | select(.agent == null) | .pane_id' \
+        | while read -r pane; do
+            herdr pane run "$pane" 'reload' || echo "WARN: could not reload $pane" >&2
+        done
+}
+
+# Only dispatch when executed, so tests/bats/herdr_reload_all.bats can source
+# this file to reach main() with stubs on PATH. The dependency checks live inside
+# main() for the same reason: at top level they would abort the mere act of
+# sourcing whenever herdr is absent, which is the normal case in CI.
+#
+# if/then rather than `[ ... ] && main "$@"`: that form leaves a non-zero status
+# as the last command when sourced, and `set -e` above would then kill the
+# sourcing shell.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi

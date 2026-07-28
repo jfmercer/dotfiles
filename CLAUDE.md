@@ -143,6 +143,7 @@ Everything in the second group is listed in `.chezmoiignore` so chezmoi never co
 - Topic directories sourced in place: `asdf/`, `atuin/`, `fzf/`, `git/`, `gpg/`, `homebrew/`, `kali/`, `macos/`, `rust/`, `system/`, `zsh/`
 - `bin/` — executables put on `$PATH` in place
 - `terminal/` — **hand-applied** terminal profiles, see below
+- `tests/` — the test suite; see "Tests" below
 - `.claude/`, `.github/`, `.vscode/`, `scripts/`, `install.sh`, and the docs
 
 ### Hand-applied config — do not judge these by "is anything referencing it?"
@@ -232,15 +233,46 @@ Two gitignore files coexist in this repo. `dot_gitignore` is managed by chezmoi 
 - OS detection pattern: `.chezmoi.os` (`"darwin"` / `"linux"`) and `.chezmoi.osRelease.id`
 - Scripts guarded by `{{- if (eq .chezmoi.os "darwin") -}}` are no-ops on other platforms
 
+## Tests
+
+`tests/run` (bats + stdlib `unittest`). Full detail in `tests/README.md`; the
+parts worth knowing before you touch anything:
+
+- **`bats-core` is the shell runner**, `brew install bats-core` locally. CI
+  installs a pinned, checksummed tarball and `bin/bump-deps` tracks the tag as a
+  `VERSION` pin, so it cannot rot.
+- **Coverage is deliberately uneven.** The `git-*` helpers are 1–13 line wrappers
+  and have no tests; testing them would only restate them. Effort goes where a
+  bug is invisible or dangerous: `bin/secret`'s `shell_quote` (its output is
+  `eval`'d by every interactive shell), `bin/herdr-reload-all`'s agent-pane
+  exclusion, the template traps documented above, and the cross-file invariants
+  no linter can see.
+- **`security` and `herdr` are stubbed; `jq` is not.** The first two are
+  macOS-only or have real side effects. `herdr-reload-all`'s behavior largely
+  *is* its jq filters, so stubbing jq would test nothing.
+- **`bin/secret` and `bin/herdr-reload-all` end in a sourced-guard** so tests can
+  reach individual functions. Use `if/then`, not `[ ... ] && main "$@"` — the
+  latter leaves a non-zero status when sourced and `set -e` kills the caller.
+  `herdr-reload-all`'s dependency checks live *inside* `main()` for the same
+  reason.
+- **`test_bump_deps.py` runs against a fixture repo**, not the real tree, which is
+  what makes `check_invariants()`'s violation branches reachable at all.
+  Registering a new pin in `bump-deps` means adding it to `tests/python/helper.py`
+  too — that coupling is intentional.
+- **A test that cannot fail is worse than none.** `tests/README.md` ends with a
+  table of one-line breakages that must each turn the suite red; all nine were
+  verified when the suite landed.
+
 ## CI
 
-`.github/workflows/ci.yaml` has four jobs. The non-interactive template defaults (`install_mac_apps: true`, etc.) are intentional for CI coverage.
+`.github/workflows/ci.yaml` has five jobs. The non-interactive template defaults (`install_mac_apps: true`, etc.) are intentional for CI coverage.
 
 | Job | Runs on | What it gates |
 |-----|---------|---------------|
 | `lint` | macos + ubuntu | Four checks. **`zsh -n`** over `dot_zshrc`, `dot_zshenv`, every `*/*.zsh` and any zsh-shebang `bin/` script — see below. **`shellcheck`** (pinned v0.11.0, installed from upstream releases so both runners agree) over `install.sh`, `scripts/*.sh`, `bin/*`, `.chezmoiscripts/*.sh`, selected by shebang so `.ps1` and zsh files are skipped; plus every `.chezmoiscripts/**/*.tmpl` rendered through `chezmoi execute-template` first. **`py_compile`** over Python scripts, which shellcheck's shebang selection skips entirely. **`bump-deps --self-test`**. Strict — the tree was clean when each landed, so a new finding is a regression. |
 
 **Why `zsh -n` is a separate gate.** shellcheck cannot parse zsh, so nothing else in CI looks at the ~25 files sourced into every interactive shell. That mattered more than it sounds: a parse error in a topic file does **not** hard-fail the shell — zsh reports it and carries on, silently dropping every alias and setting after the error. So a break would ship green and later present as "some of my aliases disappeared". The file list is derived from globs, not hardcoded, so a new topic file is covered automatically. `-n` parses without executing, which is the only safe option given these files alter `PATH`, install hooks and start the prompt.
+| `test` | macos + ubuntu | `./tests/run` — bats over the shell, stdlib `unittest` over `bin/bump-deps`. bats-core is pinned to an exact release tarball **with its sha256 verified**, for the same reason shellcheck is pinned: Ubuntu's apt `bats` trails Homebrew's by several minors and they disagree about which helpers exist. Also asserts nothing **skipped** — a missing `jq`/`zsh`/`chezmoi` makes tests skip rather than fail (deliberate, so the suite runs on a half-configured laptop), but on a runner a skip means the job silently tested less than it claims. |
 | `secrets` | ubuntu | `gitleaks` over full history (`fetch-depth: 0`). |
 | `apply` | macos + ubuntu | Copies **the checkout** into `~/.local/share/chezmoi` and runs `install.sh`, then applies a second time and asserts no drift. |
 | `bootstrap` | macos + ubuntu | Push-only. Tests the documented `curl \| bash` path, which necessarily clones `master` from GitHub, so it can only be meaningful post-merge. Needs `DOTFILES_FORCE_RESET=1`. |
