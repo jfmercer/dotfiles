@@ -48,6 +48,59 @@ jobs:
           sudo install "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
           shellcheck --version
 
+      # shellcheck cannot parse zsh, so none of the steps below look at the ~25
+      # files that get sourced into every interactive shell. That was a real
+      # hole: a parse error in, say, system/alii.zsh does NOT hard-fail the
+      # shell -- zsh reports it and carries on, silently dropping everything
+      # after the error -- so a broken topic file would ship green and surface
+      # later as "some of my aliases vanished".
+      #
+      # `zsh -n` parses without executing, which is the only safe option here:
+      # these files modify PATH, install hooks, and start the prompt.
+      - name: Syntax-check zsh files
+        run: |
+          if ! command -v zsh >/dev/null 2>&1; then
+            if [ "$RUNNER_OS" = "Linux" ]; then
+              sudo apt-get update && sudo apt-get install -y zsh
+            else
+              echo "zsh not found and no install path for $RUNNER_OS" >&2
+              exit 1
+            fi
+          fi
+          zsh --version
+
+          # Derived, not hardcoded, so a newly added topic file is covered
+          # automatically rather than silently skipped.
+          files=()
+          for f in dot_zshrc dot_zshenv; do
+            [ -f "$f" ] && files+=("$f")
+          done
+          for f in */*.zsh; do
+            [ -f "$f" ] && files+=("$f")
+          done
+          for f in bin/*; do
+            [ -f "$f" ] || continue
+            head -1 "$f" | grep -q 'zsh' && files+=("$f")
+          done
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no zsh files found -- the globs above are wrong" >&2
+            exit 1
+          fi
+
+          rc=0
+          for f in "${files[@]}"; do
+            if zsh -n "$f" 2>/tmp/zsherr; then
+              echo "  ok   $f"
+            else
+              echo "  FAIL $f"
+              sed 's/^/       /' /tmp/zsherr
+              rc=1
+            fi
+          done
+          echo "checked ${#files[@]} zsh file(s)"
+          exit $rc
+
       - name: Shellcheck plain scripts
         run: |
           # Select by shebang so .ps1 (pwsh) and bin/time-startup (zsh) are skipped.
