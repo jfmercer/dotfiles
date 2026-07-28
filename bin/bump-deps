@@ -1,0 +1,730 @@
+#!/usr/bin/env python3
+"""Report and bump the pinned dependencies scattered across this repo.
+
+Pins live in four different files with no shared mechanism, and Dependabot reads
+none of them. This walks the lot, tells you what is stale, and bumps what is
+safe to bump automatically.
+
+The important idea: a pin is not always a version. There are four classes, and
+treating them uniformly would be actively harmful -- auto-updating a GPG key
+fingerprint, for instance, would defeat the entire reason it is pinned.
+
+  VERSION  A release tag. Resolve the latest stable release and rewrite it.
+           Fully automatic.
+  EXTERNAL A commit SHA plus a sha256 in .chezmoiexternal.yaml. Bumping moves to
+           current master and recomputes the checksum, which means pulling
+           upstream code nobody has read -- so each one is confirmed
+           individually, with a compare URL.
+  CONTENT  A sha256 over an *unversioned* URL. There is no version to compare;
+           a change means upstream rewrote the file. That is a trust decision,
+           so it is reported and requires --accept.
+  ANCHOR   A security anchor (a GPG public key fingerprint). NEVER rewritten. A
+           mismatch is either key rotation, which you verify out of band against
+           the project's own announcement, or an attack.
+
+Usage:
+  bump-deps                    Report every pin: class, current, latest, status
+  bump-deps --check            Terse; exit 1 if anything needs action (CI mode)
+  bump-deps --apply            Bump VERSION pins; confirm each EXTERNAL
+  bump-deps --apply --externals-all   ... without per-external confirmation
+  bump-deps --only NAME        Restrict to one pin (repeatable)
+  bump-deps --accept NAME      Accept a changed CONTENT pin
+  bump-deps --self-test        Prove the in-place editing rewrites only what it
+                               should, then restore every file
+
+Requires: gh (authenticated), python3. No pip dependencies.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+CI = ".github/workflows/ci.yaml"
+LINUX = ".chezmoiscripts/linux/run_onchange_before_10_installs.sh.tmpl"
+EXTERNALS = ".chezmoiexternal.yaml"
+INSTALL = "install.sh"
+VERSION_FLOOR = ".chezmoiversion"
+
+# --------------------------------------------------------------------------
+# Registry. Kept here rather than in a separate manifest so it cannot drift
+# from the code that consumes it.
+#
+#   pattern    must have exactly one capture group: the pinned value.
+#   occurrences how many times the pattern is expected in the file. A mismatch
+#              aborts rather than silently editing the wrong number of lines.
+#   strip_v    upstream tags are vX.Y.Z but this pin stores X.Y.Z.
+# --------------------------------------------------------------------------
+VERSION_PINS = [
+    {
+        "name": "chezmoi",
+        "file": INSTALL,
+        "pattern": r'CHEZMOI_VERSION="([^"]+)"',
+        "repo": "twpayne/chezmoi",
+        "occurrences": 1,
+        "strip_v": False,
+    },
+    {
+        "name": "shellcheck",
+        "file": CI,
+        "pattern": r"SHELLCHECK_VERSION: (\S+)",
+        "repo": "koalaman/shellcheck",
+        "occurrences": 1,
+        "strip_v": False,
+    },
+    {
+        "name": "actions/checkout",
+        "file": CI,
+        "pattern": r"actions/checkout@(\S+)",
+        "repo": "actions/checkout",
+        "occurrences": "all",
+        "strip_v": False,
+    },
+    {
+        "name": "gitleaks-action",
+        "file": CI,
+        "pattern": r"gitleaks/gitleaks-action@(\S+)",
+        "repo": "gitleaks/gitleaks-action",
+        "occurrences": "all",
+        "strip_v": False,
+    },
+    {
+        "name": "lazygit",
+        "file": LINUX,
+        "pattern": r'LAZYGIT_VERSION="([^"]+)"',
+        "repo": "jesseduffield/lazygit",
+        "occurrences": 1,
+        "strip_v": True,
+    },
+]
+
+CONTENT_PINS = [
+    {
+        "name": "rustup",
+        "file": LINUX,
+        "pattern": r'RUSTUP_INIT_SHA256="([0-9a-f]{64})"',
+        "url": "https://sh.rustup.rs",
+        "occurrences": 1,
+        "note": "installer script at an unversioned URL",
+    },
+]
+
+ANCHOR_PINS = [
+    {
+        "name": "eza-key",
+        "file": LINUX,
+        "pattern": r'EZA_KEY_FPR="([0-9A-F]{40})"',
+        "url": "https://raw.githubusercontent.com/eza-community/eza/main/deb.asc",
+        "kind": "gpg-fingerprint",
+        "verify_at": "https://github.com/eza-community/eza",
+    },
+]
+
+# ------------------------------------------------------------------ plumbing
+
+
+class Problem(Exception):
+    pass
+
+
+def path(rel: str) -> str:
+    return os.path.join(REPO, rel)
+
+
+def read(rel: str) -> str:
+    with open(path(rel), encoding="utf-8") as fh:
+        return fh.read()
+
+
+def write(rel: str, text: str) -> None:
+    with open(path(rel), "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def gh_text(*args: str, required: bool = True) -> str:
+    """Run `gh api` and return stdout, stripped.
+
+    Note these calls all pass --jq, so gh emits a bare scalar rather than JSON --
+    do not try to json.loads() the result. gh handles auth on both laptop and CI.
+
+    required=False is for lookups that may legitimately 404, e.g. asking for the
+    newest tag of a repo that has never tagged a release.
+    """
+    if not shutil.which("gh"):
+        raise Problem("gh is not installed; it supplies the GitHub API")
+    out = subprocess.run(["gh", "api", *args], capture_output=True, text=True, check=False)
+    if out.returncode != 0:
+        if required:
+            raise Problem(f"gh api {args[0]} failed: {out.stderr.strip().splitlines()[0:1]}")
+        return ""
+    return out.stdout.strip()
+
+
+def latest_release(repo: str) -> str:
+    tag = gh_text(f"repos/{repo}/releases/latest", "--jq", ".tag_name")
+    if not tag or tag == "null":
+        raise Problem(f"{repo}: no latest release; pin it by tag or commit instead")
+    return tag
+
+
+def head_sha(repo: str) -> str:
+    return gh_text(f"repos/{repo}/commits/HEAD", "--jq", ".sha")
+
+
+def commit_date(repo: str, sha: str) -> str:
+    d = gh_text(f"repos/{repo}/commits/{sha}", "--jq", ".commit.committer.date", required=False)
+    return d.split("T")[0] if d else "unknown"
+
+
+def nearest_tag(repo: str) -> str:
+    tag = gh_text(f"repos/{repo}/tags?per_page=1", "--jq", ".[0].name", required=False)
+    return "" if tag == "null" else tag
+
+
+def ahead_by(repo: str, sha: str) -> int:
+    n = gh_text(f"repos/{repo}/compare/{sha}...HEAD", "--jq", ".ahead_by", required=False)
+    try:
+        return int(n)
+    except ValueError:
+        return -1
+
+
+def sha256_of_url(url: str) -> str:
+    h = hashlib.sha256()
+    with urllib.request.urlopen(url) as resp:  # noqa: S310 - fixed https hosts
+        for chunk in iter(lambda: resp.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def gpg_fingerprint(url: str) -> str:
+    if not shutil.which("gpg"):
+        return ""
+    with urllib.request.urlopen(url) as resp:  # noqa: S310
+        armored = resp.read()
+    out = subprocess.run(
+        ["gpg", "--show-keys", "--with-colons", "-"],
+        input=armored,
+        capture_output=True,
+        check=False,
+    )
+    for line in out.stdout.decode().splitlines():
+        if line.startswith("fpr:"):
+            return line.split(":")[9]
+    return ""
+
+
+def current_value(pin: dict) -> str:
+    found = re.findall(pin["pattern"], read(pin["file"]))
+    if not found:
+        raise Problem(f"{pin['name']}: pattern not found in {pin['file']}")
+    if len(set(found)) > 1:
+        raise Problem(f"{pin['name']}: inconsistent values in {pin['file']}: {set(found)}")
+    want = pin.get("occurrences", 1)
+    if want != "all" and len(found) != want:
+        raise Problem(
+            f"{pin['name']}: expected {want} occurrence(s) in {pin['file']}, found {len(found)}"
+        )
+    return found[0]
+
+
+def replace_value(pin: dict, old: str, new: str) -> int:
+    """Rewrite a pin in place. Returns the number of substitutions made."""
+    text = read(pin["file"])
+    # Rebuild the matched text rather than substituting blind, so we only ever
+    # touch the capture group and never surrounding syntax.
+    pattern = re.compile(pin["pattern"])
+
+    def sub(m: re.Match) -> str:
+        return m.group(0).replace(m.group(1), new, 1)
+
+    updated, n = pattern.subn(sub, text)
+    if n == 0:
+        raise Problem(f"{pin['name']}: nothing replaced in {pin['file']}")
+    write(pin["file"], updated)
+    return n
+
+
+# --------------------------------------------------------- externals parsing
+
+
+def parse_externals() -> list[dict]:
+    """Pull each pinned external out of .chezmoiexternal.yaml.
+
+    Deliberately not using a YAML library: 36 of this file's 136 lines are
+    comments explaining why each thing is pinned, and load/dump would erase all
+    of them. Line-oriented parsing keeps the file byte-stable apart from the
+    values we mean to change.
+    """
+    lines = read(EXTERNALS).splitlines()
+    out: list[dict] = []
+    archive = re.compile(r'url: "https://github\.com/([^/]+/[^/]+)/archive/([0-9a-f]{40})\.tar\.gz"')
+    tagfile = re.compile(r'url: "https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)/(.+)"')
+    for i, line in enumerate(lines):
+        m = archive.search(line)
+        if m:
+            out.append(
+                {
+                    "kind": "archive",
+                    "repo": m.group(1),
+                    "ref": m.group(2),
+                    "url_line": i,
+                    "sha_line": _next_sha_line(lines, i),
+                    "comment_line": _prev_comment_line(lines, i),
+                }
+            )
+            continue
+        m = tagfile.search(line)
+        if m:
+            out.append(
+                {
+                    "kind": "file",
+                    "repo": m.group(1),
+                    "ref": m.group(2),
+                    "asset": m.group(3),
+                    "url_line": i,
+                    "sha_line": _next_sha_line(lines, i),
+                    "comment_line": None,
+                }
+            )
+    return out
+
+
+def _next_sha_line(lines: list[str], start: int) -> int:
+    for j in range(start, min(start + 8, len(lines))):
+        if re.search(r'sha256: "([0-9a-f]{64})"', lines[j]):
+            return j
+    raise Problem(f"no sha256 within 8 lines of {EXTERNALS}:{start + 1}")
+
+
+def _prev_comment_line(lines: list[str], start: int) -> int | None:
+    for j in range(start - 1, max(start - 5, -1), -1):
+        if lines[j].startswith("# ") and " @ " in lines[j]:
+            return j
+    return None
+
+
+def bump_external(ext: dict, new_ref: str, new_sum: str, new_date: str, new_tag: str) -> None:
+    lines = read(EXTERNALS).splitlines(keepends=True)
+
+    def swap(idx: int, old: str, new: str) -> None:
+        if old not in lines[idx]:
+            raise Problem(f"{EXTERNALS}:{idx + 1}: expected {old[:12]}... on this line")
+        lines[idx] = lines[idx].replace(old, new, 1)
+
+    swap(ext["url_line"], ext["ref"], new_ref)
+    old_sum = re.search(r'sha256: "([0-9a-f]{64})"', lines[ext["sha_line"]]).group(1)
+    swap(ext["sha_line"], old_sum, new_sum)
+    if ext["comment_line"] is not None:
+        tag = f" (nearest tag: {new_tag})" if new_tag else ""
+        lines[ext["comment_line"]] = f"# {ext['repo']} @ {new_date}{tag}\n"
+    write(EXTERNALS, "".join(lines))
+
+
+# ------------------------------------------------------------------ invariants
+
+
+def check_invariants() -> list[str]:
+    problems = []
+
+    # 1. The floor must not exceed the version the bootstrap actually installs,
+    #    or a fresh machine installs chezmoi and then chezmoi refuses to run.
+    floor = read(VERSION_FLOOR).strip().lstrip("v")
+    pinned = current_value(VERSION_PINS[0]).lstrip("v")
+
+    def tup(v: str) -> tuple:
+        return tuple(int(x) for x in re.findall(r"\d+", v))
+
+    if tup(floor) > tup(pinned):
+        problems.append(
+            f"{VERSION_FLOOR} ({floor}) exceeds install.sh CHEZMOI_VERSION ({pinned}): "
+            "a fresh bootstrap would install chezmoi and then be refused by it"
+        )
+
+    # 2. Every external must carry both a pinned ref and a checksum.
+    text = read(EXTERNALS)
+    if text.count("url:") != text.count("sha256:"):
+        problems.append(
+            f"{EXTERNALS}: {text.count('url:')} url entries but "
+            f"{text.count('sha256:')} checksums -- every external must have both"
+        )
+    if "master.tar.gz" in text or "/HEAD/" in text:
+        problems.append(f"{EXTERNALS}: an entry is tracking a moving ref instead of a pin")
+
+    # 3. Actions must be pinned to an exact release, not a floating major tag.
+    for pin in VERSION_PINS:
+        if "/" not in pin["name"] and pin["name"] != "gitleaks-action":
+            continue
+        val = current_value(pin)
+        if not re.match(r"^v?\d+\.\d+\.\d+", val):
+            problems.append(
+                f"{pin['name']} is pinned to '{val}', a floating tag; "
+                "use an exact release so the workflow is reproducible"
+            )
+    return problems
+
+
+# --------------------------------------------------------------------- report
+
+
+class Row:
+    def __init__(self, name, klass, current, latest, status, detail=""):
+        self.name, self.klass, self.current = name, klass, current
+        self.latest, self.status, self.detail = latest, status, detail
+
+    @property
+    def actionable(self) -> bool:
+        return self.status != "current"
+
+
+def gather(only: set[str]) -> list[Row]:
+    rows: list[Row] = []
+
+    for pin in VERSION_PINS:
+        if only and pin["name"] not in only:
+            continue
+        cur = current_value(pin)
+        tag = latest_release(pin["repo"])
+        latest = tag.lstrip("v") if pin["strip_v"] else tag
+        rows.append(
+            Row(pin["name"], "VERSION", cur, latest, "current" if cur == latest else "stale")
+        )
+
+    for ext in parse_externals():
+        name = ext["repo"].split("/")[-1]
+        if only and name not in only:
+            continue
+        if ext["kind"] == "archive":
+            head = head_sha(ext["repo"])
+            behind = ahead_by(ext["repo"], ext["ref"])
+            rows.append(
+                Row(
+                    name,
+                    "EXTERNAL",
+                    ext["ref"][:12],
+                    head[:12],
+                    "current" if head == ext["ref"] else "behind",
+                    f"{behind} commit(s)" if behind > 0 else "",
+                )
+            )
+        else:
+            tag = nearest_tag(ext["repo"])
+            rows.append(
+                Row(
+                    name,
+                    "EXTERNAL",
+                    ext["ref"],
+                    tag,
+                    "current" if tag == ext["ref"] else "stale",
+                )
+            )
+
+    for pin in CONTENT_PINS:
+        if only and pin["name"] not in only:
+            continue
+        cur = current_value(pin)
+        live = sha256_of_url(pin["url"])
+        rows.append(
+            Row(
+                pin["name"],
+                "CONTENT",
+                cur[:12],
+                live[:12],
+                "current" if cur == live else "CHANGED",
+                pin["note"],
+            )
+        )
+
+    for pin in ANCHOR_PINS:
+        if only and pin["name"] not in only:
+            continue
+        cur = current_value(pin)
+        live = gpg_fingerprint(pin["url"])
+        if not live:
+            rows.append(Row(pin["name"], "ANCHOR", cur[:12], "?", "unverifiable", "gpg missing"))
+        else:
+            rows.append(
+                Row(
+                    pin["name"],
+                    "ANCHOR",
+                    cur[:12],
+                    live[:12],
+                    "current" if cur == live else "ROTATED",
+                    pin["kind"],
+                )
+            )
+    return rows
+
+
+def print_report(rows: list[Row], problems: list[str]) -> None:
+    w = max(len(r.name) for r in rows) if rows else 10
+    print(f"{'PIN'.ljust(w)}  {'CLASS':8}  {'CURRENT':14}  {'LATEST':14}  STATUS")
+    print(f"{'-' * w}  {'-' * 8}  {'-' * 14}  {'-' * 14}  ------")
+    for r in rows:
+        flag = "" if r.status == "current" else "  <--"
+        extra = f"  ({r.detail})" if r.detail and r.actionable else ""
+        print(
+            f"{r.name.ljust(w)}  {r.klass:8}  {r.current:14}  {r.latest:14}  {r.status}{flag}{extra}"
+        )
+    if problems:
+        print("\nInvariant violations:")
+        for p in problems:
+            print(f"  ! {p}")
+
+
+# ---------------------------------------------------------------------- apply
+
+
+def apply_versions(rows: list[Row], dry: bool) -> int:
+    changed = 0
+    for pin in VERSION_PINS:
+        row = next((r for r in rows if r.name == pin["name"]), None)
+        if row is None or not row.actionable:
+            continue
+        print(f"  {pin['name']}: {row.current} -> {row.latest}")
+        if not dry:
+            n = replace_value(pin, row.current, row.latest)
+            print(f"    {pin['file']} ({n} occurrence(s))")
+        changed += 1
+    return changed
+
+
+def apply_externals(rows: list[Row], confirm: bool) -> int:
+    changed = 0
+    for ext in parse_externals():
+        name = ext["repo"].split("/")[-1]
+        row = next((r for r in rows if r.name == name and r.klass == "EXTERNAL"), None)
+        if row is None or not row.actionable:
+            continue
+        if ext["kind"] == "archive":
+            new_ref = head_sha(ext["repo"])
+            compare = f"https://github.com/{ext['repo']}/compare/{ext['ref']}...{new_ref}"
+            print(f"\n  {ext['repo']}: {row.detail} behind")
+            print(f"    review: {compare}")
+            if confirm and input("    bump? [y/N] ").strip().lower() != "y":
+                print("    skipped")
+                continue
+            url = f"https://github.com/{ext['repo']}/archive/{new_ref}.tar.gz"
+            new_sum = sha256_of_url(url)
+            bump_external(
+                ext, new_ref, new_sum, commit_date(ext["repo"], new_ref), nearest_tag(ext["repo"])
+            )
+            print(f"    -> {new_ref[:12]}  sha256 {new_sum[:12]}...")
+        else:
+            new_ref = nearest_tag(ext["repo"])
+            print(f"\n  {ext['repo']}: {ext['ref']} -> {new_ref}")
+            if confirm and input("    bump? [y/N] ").strip().lower() != "y":
+                print("    skipped")
+                continue
+            url = f"https://raw.githubusercontent.com/{ext['repo']}/{new_ref}/{ext['asset']}"
+            new_sum = sha256_of_url(url)
+            bump_external(ext, new_ref, new_sum, "", "")
+            print(f"    -> sha256 {new_sum[:12]}...")
+        changed += 1
+    return changed
+
+
+def verify_externals() -> bool:
+    if not shutil.which("chezmoi"):
+        print("  chezmoi not on PATH; skipping external verification")
+        return True
+    print("\nVerifying externals against their new checksums...")
+    r = subprocess.run(
+        ["chezmoi", "apply", "--dry-run", "--refresh-externals", "--include=externals"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=REPO,
+    )
+    if r.returncode != 0:
+        print(f"  FAILED:\n{r.stdout}{r.stderr}")
+        return False
+    print("  all checksums verify")
+    return True
+
+
+# ------------------------------------------------------------------ self-test
+
+
+def self_test() -> int:
+    """Prove replace_value touches only the capture group, then restore."""
+    targets = VERSION_PINS + CONTENT_PINS
+    failures = 0
+    backups: dict[str, str] = {}
+    for pin in {p["file"]: p for p in targets}:
+        backups[pin] = read(pin)
+    try:
+        for pin in targets:
+            before = read(pin["file"])
+            cur = current_value(pin)
+            sentinel = "9" * len(cur) if cur.isdigit() or re.fullmatch(r"[0-9a-f]+", cur) else "Z.Z.Z"
+            replace_value(pin, cur, sentinel)
+            after = read(pin["file"])
+            # Only the pinned value may differ, and the line count must not change.
+            if before.count("\n") != after.count("\n"):
+                print(f"  FAIL {pin['name']}: line count changed")
+                failures += 1
+            diffs = [
+                (a, b)
+                for a, b in zip(before.splitlines(), after.splitlines())
+                if a != b
+            ]
+            bad = [(a, b) for a, b in diffs if a.replace(cur, sentinel) != b]
+            if bad:
+                print(f"  FAIL {pin['name']}: edit changed more than the value: {bad[:1]}")
+                failures += 1
+            elif not diffs:
+                print(f"  FAIL {pin['name']}: nothing changed")
+                failures += 1
+            else:
+                print(f"  ok   {pin['name']}: {len(diffs)} line(s), value only")
+            write(pin["file"], before)
+    finally:
+        for f, text in backups.items():
+            write(f, text)
+    # Externals: round-trip one entry.
+    exts = parse_externals()
+    print(f"  ok   parsed {len(exts)} external(s) from {EXTERNALS}")
+    before = read(EXTERNALS)
+    if exts:
+        e = exts[0]
+        fake = "0" * 40
+        bump_external(e, fake, "1" * 64, "1970-01-01", "vTEST")
+        after = read(EXTERNALS)
+        write(EXTERNALS, before)
+        if before.count("\n") != after.count("\n"):
+            print("  FAIL externals: line count changed")
+            failures += 1
+        elif before == after:
+            print("  FAIL externals: nothing changed")
+            failures += 1
+        else:
+            n = sum(1 for a, b in zip(before.splitlines(), after.splitlines()) if a != b)
+            print(f"  ok   externals: {n} line(s) changed, comments preserved")
+        if read(EXTERNALS) != before:
+            print("  FAIL externals: restore did not round-trip")
+            failures += 1
+    return failures
+
+
+# --------------------------------------------------------------------- main
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="Report and bump this repo's pinned dependencies.",
+        epilog="Run with no arguments for a status table.",
+    )
+    ap.add_argument("--check", action="store_true", help="terse; exit 1 if action needed")
+    ap.add_argument("--apply", action="store_true", help="bump VERSION pins and confirmed EXTERNALs")
+    ap.add_argument("--externals-all", action="store_true", help="skip per-external confirmation")
+    ap.add_argument("--only", action="append", default=[], metavar="NAME", help="restrict to one pin")
+    ap.add_argument("--accept", action="append", default=[], metavar="NAME", help="accept a CONTENT change")
+    ap.add_argument("--self-test", action="store_true", help="verify in-place editing is surgical")
+    args = ap.parse_args()
+
+    if args.self_test:
+        print("Self-test: in-place editing")
+        n = self_test()
+        print("\nPASS" if n == 0 else f"\nFAIL ({n} problem(s))")
+        return 1 if n else 0
+
+    only = set(args.only)
+    try:
+        rows = gather(only)
+        problems = check_invariants()
+    except Problem as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    anchors_rotated = [r for r in rows if r.klass == "ANCHOR" and r.status == "ROTATED"]
+
+    if args.check:
+        stale = [r for r in rows if r.actionable]
+        for r in stale:
+            print(f"{r.status}: {r.name} ({r.klass}) {r.current} -> {r.latest}")
+        for p in problems:
+            print(f"invariant: {p}")
+        if not stale and not problems:
+            print("all pins current")
+        return 1 if (stale or problems) else 0
+
+    # In --apply mode the table is reprinted at the end; showing it twice for 21
+    # pins is just noise.
+    if not args.apply:
+        print_report(rows, problems)
+
+    if anchors_rotated:
+        print("\n" + "=" * 70)
+        for r in anchors_rotated:
+            pin = next(p for p in ANCHOR_PINS if p["name"] == r.name)
+            print(f"SECURITY: {r.name} fingerprint changed.")
+            print(f"  pinned {r.current}...  upstream {r.latest}...")
+            print("  This is either an upstream key rotation or an attack. It is NOT")
+            print("  updated automatically, by design. Verify the new key against the")
+            print(f"  project's own announcement ({pin['verify_at']}) before editing")
+            print(f"  {pin['file']} by hand.")
+        print("=" * 70)
+
+    for pin in CONTENT_PINS:
+        row = next((r for r in rows if r.name == pin["name"]), None)
+        if row is None or not row.actionable:
+            continue
+        if pin["name"] in args.accept:
+            live = sha256_of_url(pin["url"])
+            replace_value(pin, current_value(pin), live)
+            print(f"\naccepted {pin['name']}: now {live[:12]}...")
+        else:
+            print(
+                f"\n{pin['name']} content changed ({pin['note']}). There is no version to"
+                f"\ncompare -- upstream rewrote the file. Review it, then re-run with"
+                f"\n  bump-deps --accept {pin['name']}"
+            )
+
+    if not args.apply:
+        # Distinguish what --apply can actually fix from what needs a human.
+        # Telling someone to "--apply" a rotated GPG fingerprint would be wrong.
+        bumpable = [r for r in rows if r.actionable and r.klass in ("VERSION", "EXTERNAL")]
+        manual = [r for r in rows if r.actionable and r.klass in ("CONTENT", "ANCHOR")]
+        if bumpable:
+            print(f"\n{len(bumpable)} pin(s) bumpable: re-run with --apply.")
+        if manual:
+            names = ", ".join(r.name for r in manual)
+            print(f"{len(manual)} pin(s) need a human decision, not --apply: {names}")
+        if problems:
+            print(f"{len(problems)} invariant violation(s) above must be fixed by hand.")
+        return 0
+
+    print("\nApplying...")
+    changed = apply_versions(rows, dry=False)
+    changed += apply_externals(rows, confirm=not args.externals_all)
+    if changed == 0:
+        print("  nothing to do")
+        return 0
+    if not verify_externals():
+        return 1
+    print(f"\nBumped {changed} pin(s). Re-checking...")
+    rows = gather(only)
+    problems = check_invariants()
+    print_report(rows, problems)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Problem as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
+    except KeyboardInterrupt:
+        sys.exit(130)

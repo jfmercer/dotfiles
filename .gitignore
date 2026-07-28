@@ -2,3 +2,6 @@
 # run_onchange_before_30_linux_aliases.sh script; those aliases now live in
 # system/alii.zsh behind an $OSTYPE guard. Safe to delete on those machines.
 system/linux.zsh
+
+# Byte-cache from `python3 -m py_compile bin/bump-deps` (CI lint step)
+__pycache__/
