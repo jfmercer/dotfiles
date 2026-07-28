@@ -7,7 +7,7 @@ export ANSIBLE_NOCOWS=1
 # sets its own. Blanket-forcing xterm-256color threw all of that away -- it cost
 # undercurl and the kitty keyboard protocol under Ghostty, replaced tmux's own
 # terminfo, and actively lied on the Linux virtual console (TERM=linux), which
-# has neither 256 colours nor xterm's key sequences.
+# has neither 256 colors nor xterm's key sequences.
 #
 # The one case where overriding is right is a TERM this machine has no terminfo
 # entry for at all -- e.g. ssh-ing from Ghostty into a box without
