@@ -191,9 +191,19 @@ template_list() {
 # ------------------------------------------------------- all script templates
 
 @test "every chezmoiscripts template renders without error" {
+    # Render against the config .chezmoi.yaml.tmpl itself generates, NOT against
+    # whatever this machine happens to have in ~/.config/chezmoi. Several of these
+    # scripts read .set_git_to_ssh / .install_linux_apps out of the data map, so
+    # with no config they fail with "map has no entry for key" -- which is a
+    # property of the test environment, not of the templates. Using the repo's own
+    # defaults keeps this hermetic and matches how the other tests here work.
+    "${CM[@]}" execute-template --init <"$REPO_ROOT/.chezmoi.yaml.tmpl" \
+        >"$BATS_TEST_TMPDIR/defaults.yaml"
+
     local tmpl rc=0
     while read -r tmpl; do
-        if ! "${CM[@]}" execute-template <"$tmpl" >/dev/null 2>"$BATS_TEST_TMPDIR/err"; then
+        if ! "${CM[@]}" execute-template --config "$BATS_TEST_TMPDIR/defaults.yaml" \
+            <"$tmpl" >/dev/null 2>"$BATS_TEST_TMPDIR/err"; then
             printf 'FAILED to render %s:\n%s\n' "$tmpl" "$(cat "$BATS_TEST_TMPDIR/err")" >&2
             rc=1
         fi
