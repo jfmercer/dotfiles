@@ -280,13 +280,18 @@ jobs:
       # The fixture pins a real commit under a deliberately wrong version comment,
       # so ref-version-mismatch must fire; if it doesn't, either the token is
       # missing or the audit regressed, and in both cases the step above became
-      # decoration. --format=json disables zizmor's 11+ exit codes, so this
-      # inspects the output rather than the status.
+      # decoration.
+      #
+      # --no-exit-codes matters: a finding here is the *expected* result, but
+      # zizmor still exits 13 for it, and `bash -e` would kill the step before
+      # the assertion below ever ran. (zizmor's docs say --format=json already
+      # suppresses those codes. As of v1.28.0 it does not.) The real scan above
+      # keeps its exit-code gate.
       - name: Assert zizmor's online audits ran
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          zizmor --format=json tests/fixtures/zizmor/canary.yml > /tmp/canary.json
+          zizmor --no-exit-codes --format=json tests/fixtures/zizmor/canary.yml > /tmp/canary.json
           python3 - <<'PY'
           import json, sys
 
