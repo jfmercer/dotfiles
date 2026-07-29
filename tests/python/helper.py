@@ -7,7 +7,7 @@ not find it. It is loaded here by file path instead.
 
 It also resolves everything relative to a module-level ``REPO`` constant computed
 from ``__file__``, and its editing functions write in place. Tests therefore build
-a miniature repo in a temp directory -- containing only the four files that hold
+a miniature repo in a temp directory -- containing only the five files that hold
 pins -- and repoint ``REPO`` at it. Nothing in the real tree is touched, and the
 fixtures can be corrupted freely to reach the invariant-violation branches, which
 are otherwise unreachable without breaking the actual repo.
@@ -57,29 +57,66 @@ CHEZMOI_VERSION="v2.71.1"
 echo "installing ${CHEZMOI_VERSION}"
 """
 
-# Every VERSION pin whose file is CI must appear here, or gather() raises
-# "pattern not found" -- which is the intended coupling: registering a new pin in
-# bump-deps should require saying what a correct file looks like.
-CI_YAML = """\
+# Every VERSION and ACTION pin whose file is CI must appear here, or gather()
+# raises "pattern not found" -- which is the intended coupling: registering a new
+# pin in bump-deps should require saying what a correct file looks like.
+#
+# The action pins are commit SHAs with a `# vX.Y.Z` comment, matching the real
+# tree. Made-up but well-formed 40-hex values: the ACTION tests never hit the
+# network, and a fixture carrying the real SHAs would need editing every time
+# upstream cuts a release.
+CHECKOUT_SHA = "a" * 40
+GITLEAKS_SHA = "b" * 40
+
+CI_YAML = f"""\
 name: 'CI'
 jobs:
   lint:
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@{CHECKOUT_SHA} # v7.0.1
       - name: Install shellcheck
         env:
           SHELLCHECK_VERSION: v0.11.0
         run: shellcheck --version
+  workflows:
+    steps:
+      - name: Install shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.11.0
+        run: shellcheck --version
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: v1.7.12
+        run: actionlint --version
+      - name: Install zizmor
+        env:
+          ZIZMOR_VERSION: v1.28.0
+        run: zizmor --version
   test:
     steps:
       - name: Install bats-core
         env:
           BATS_VERSION: v1.14.0
         run: bats --version
+      - name: Install ruff
+        env:
+          RUFF_VERSION: 0.16.0
+        run: ruff --version
   secrets:
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: gitleaks/gitleaks-action@v3.0.0
+      - uses: actions/checkout@{CHECKOUT_SHA} # v7.0.1
+      - uses: gitleaks/gitleaks-action@{GITLEAKS_SHA} # v3.0.0
+"""
+
+# actions/checkout is pinned in both workflows, which is the whole reason ACTION
+# pins carry a list of files. A fixture with only ci.yaml would let a regression
+# that silently ignores the second file pass.
+DEPS_YAML = f"""\
+name: 'Dependency staleness'
+jobs:
+  check:
+    steps:
+      - uses: actions/checkout@{CHECKOUT_SHA} # v7.0.1
 """
 
 LINUX_TMPL = """\
@@ -128,6 +165,7 @@ VERSION_FLOOR = "v2.71.1\n"
 FIXTURES = {
     "install.sh": INSTALL_SH,
     ".github/workflows/ci.yaml": CI_YAML,
+    ".github/workflows/deps.yaml": DEPS_YAML,
     ".chezmoiscripts/linux/run_onchange_before_10_installs.sh.tmpl": LINUX_TMPL,
     ".chezmoiexternal.yaml": EXTERNALS_YAML,
     ".chezmoiversion": VERSION_FLOOR,
@@ -166,9 +204,27 @@ def read(repo: str, rel: str) -> str:
 
 
 def pin(name: str) -> dict:
-    """Look a pin up by name across all three registries."""
-    for group in (bump_deps.VERSION_PINS, bump_deps.CONTENT_PINS, bump_deps.ANCHOR_PINS):
+    """Look a pin up by name across all four registries."""
+    for group in ALL_REGISTRIES:
         for entry in group:
             if entry["name"] == name:
                 return entry
     raise KeyError(name)
+
+
+# Every registry, in one place, so a test that sweeps "all pins" picks up a newly
+# added class automatically instead of silently continuing to check three of four.
+ALL_REGISTRIES = (
+    bump_deps.VERSION_PINS,
+    bump_deps.ACTION_PINS,
+    bump_deps.CONTENT_PINS,
+    bump_deps.ANCHOR_PINS,
+)
+
+# The registries whose pins replace_value() edits -- i.e. everything except
+# ACTION, which has two capture groups and its own rewriter.
+SINGLE_GROUP_REGISTRIES = (
+    bump_deps.VERSION_PINS,
+    bump_deps.CONTENT_PINS,
+    bump_deps.ANCHOR_PINS,
+)

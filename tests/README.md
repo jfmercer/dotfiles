@@ -50,6 +50,23 @@ the code where a bug is either invisible or dangerous:
   `check_invariants()` at all. These tests use a fixture repo, which makes every
   violation branch reachable.
 
+  The `ACTION` pin class gets disproportionate coverage for its size, because two
+  of its failure modes are silent. A pin rewritten in `ci.yaml` but not
+  `deps.yaml` leaves the tree inconsistent while `--check` still reports
+  "current"; and a commit updated without its `# vX.Y.Z` comment leaves the
+  comment lying about what actually runs. Both are invisible in a diff review,
+  so `fixture_repo` carries **both** workflow files and the tests assert across
+  them.
+
+## The zizmor canary is CI-only, deliberately
+
+`tests/fixtures/zizmor/canary.yml` is not run by `tests/run`. It is consumed by
+the `workflows` job in CI, which is the only place a `GH_TOKEN` exists — and
+proving zizmor's *online* audits ran is the fixture's entire purpose. Wiring it
+into the local suite would mean it skips on any machine without zizmor, and CI's
+"nothing skipped" assertion would then fail for a dependency the `test` job has
+no reason to install. See CLAUDE.md for what the canary asserts and why.
+
 ## How the shell tests avoid the real world
 
 `helpers/stub.bash` puts a per-test directory at the front of `PATH` and writes
@@ -106,3 +123,8 @@ put it back:
 | `.chezmoiversion` → `2.99.0` | `test_floor_above_...`, and an invariants test |
 | remove `bin/` from `.chezmoiignore` | `invariants.bats` |
 | edit `HOMEBREW_CASK_OPTS` in `homebrew/exports.zsh` only | `templates.bats` |
+| revert any `actions/checkout` pin in `ci.yaml` to `@v7.0.1` | `test_the_real_repo_satisfies_its_own_invariants` |
+| change the `# v7.0.1` comment beside a checkout SHA to `# v6.0.0` | `bump-deps --check`, and zizmor's `ref-version-mismatch` in CI |
+| drop `deps.yaml` from `ACTION_PINS`'s `files` | `test_the_second_workflow_is_checked_too` |
+| `replace_action_pin`: stop rewriting `m.group(2)` | `bump-deps --self-test`, and 2 `ReplaceActionPin` tests |
+| correct `tests/fixtures/zizmor/canary.yml`'s version comment | the `workflows` job's canary step (CI only) |

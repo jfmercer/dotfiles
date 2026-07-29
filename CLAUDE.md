@@ -81,13 +81,31 @@ bump-deps --self-test  # prove the in-place editing is surgical
 | Class | Where | Bumping means |
 |-------|-------|---------------|
 | `VERSION` | `install.sh`, `ci.yaml`, linux installs | Latest stable release. Automatic. |
+| `ACTION` | `ci.yaml`, `deps.yaml` | A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment. Resolves the latest release's tag to its commit and rewrites **both halves together**. Automatic. |
 | `EXTERNAL` | `.chezmoiexternal.yaml` (14) | Move to master HEAD, recompute checksum. Confirmed per entry, because it pulls upstream code nobody has read. |
 | `CONTENT` | `RUSTUP_INIT_SHA256` | A hash over an *unversioned* URL. A change means upstream rewrote the installer — a trust decision, so it needs `--accept rustup`. |
 | `ANCHOR` | `EZA_KEY_FPR` | A GPG public-key fingerprint. **Never rewritten automatically.** A mismatch is key rotation or an attack; verify against upstream's own announcement and edit by hand. |
 
-It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and Actions pinned to a floating major tag rather than an exact release.
+It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and Actions **not** pinned to a commit SHA with a matching version comment.
 
 `.github/workflows/deps.yaml` runs `--check` weekly and keeps a single tracking issue in sync. It never commits — bumping stays deliberate.
+
+#### Why Actions are hash-pinned, and why the comment is load-bearing
+
+The invariant above used to demand the opposite — an exact `vX.Y.Z` tag, rejecting a commit SHA as a "floating tag". That was backwards, for the reason this file already gives for the externals: a tag can be force-moved by anyone able to push to the action's repo, a commit cannot. These run with a `GITHUB_TOKEN`, so it matters more here, not less.
+
+The bigger point is that **hash-pinning is what makes the pin auditable at all.** Four zizmor audits inspect the SHA, and none of them can run on a tag pin:
+
+| Audit | Verifies |
+|---|---|
+| `impostor-commit` | The commit came from that repo, not a **fork in its network**. GitHub serves any commit in a fork network from any repo URL in it, so `actions/checkout@<attacker-fork-sha>` resolves and looks legitimate. |
+| `ref-version-mismatch` | The `# vX.Y.Z` comment actually corresponds to that commit. |
+| `stale-action-refs` | The commit sits on a release tag, not an arbitrary mid-development one. |
+| `known-vulnerable-actions` | No CVE against the pinned version. |
+
+So the trailing comment is not decoration — it is checked, which is why `bump-deps` rewrites the SHA and the comment as one operation rather than leaving the comment to rot into a lie.
+
+`actions/checkout` is pinned in **both** workflows, which is why an `ACTION` pin holds a list of files. Before this class existed only `ci.yaml` was registered, so `--apply` would rewrite five pins there, silently leave `deps.yaml` behind, and then report "all pins current" — the staleness detector certifying a file it had never read.
 
 ### Zsh loading order (`dot_zshrc`)
 1. `*/exports.zsh` files — environment variables
@@ -265,21 +283,27 @@ parts worth knowing before you touch anything:
 
 ## CI
 
-`.github/workflows/ci.yaml` has five jobs. The non-interactive template defaults (`install_mac_apps: true`, etc.) are intentional for CI coverage.
+`.github/workflows/ci.yaml` has six jobs. The non-interactive template defaults (`install_mac_apps: true`, etc.) are intentional for CI coverage.
+
+Every job runs with `permissions: contents: read`, set once at the workflow level. Without it jobs inherit the repository's `default_workflow_permissions`, which is `write` — so `bootstrap` (which pipes a curl'd script into bash) and `apply` (which executes this whole tree) were being handed a read/write `GITHUB_TOKEN` for no reason. Every checkout also sets `persist-credentials: false`, which matters most in `apply`, since it copies the checkout — `.git` included — into `~/.local/share/chezmoi`.
 
 | Job | Runs on | What it gates |
 |-----|---------|---------------|
-| `lint` | macos + ubuntu | Four checks. **`zsh -n`** over `dot_zshrc`, `dot_zshenv`, every `*/*.zsh` and any zsh-shebang `bin/` script — see below. **`shellcheck`** (pinned v0.11.0, installed from upstream releases so both runners agree) over `install.sh`, `scripts/*.sh`, `bin/*`, `.chezmoiscripts/*.sh`, selected by shebang so `.ps1` and zsh files are skipped; plus every `.chezmoiscripts/**/*.tmpl` rendered through `chezmoi execute-template` first. **`py_compile`** over Python scripts, which shellcheck's shebang selection skips entirely. **`bump-deps --self-test`**. Strict — the tree was clean when each landed, so a new finding is a regression. |
+| `lint` | macos + ubuntu | Five checks. **`zsh -n`** over `dot_zshrc`, `dot_zshenv`, every `*/*.zsh` and any zsh-shebang `bin/` script — see below. **`shellcheck`** (pinned v0.11.0, installed from upstream releases so both runners agree) over `install.sh`, `scripts/*.sh`, `bin/*`, `.chezmoiscripts/*.sh`, selected by shebang so `.ps1` and zsh files are skipped; plus every `.chezmoiscripts/**/*.tmpl` rendered through `chezmoi execute-template` first. **`py_compile`** over Python scripts, which shellcheck's shebang selection skips entirely. **`ruff`** (`E9,F,S`, ignoring `S603`/`S607`) over `bin/bump-deps` and `tests/python/` — `py_compile` only proves a file parses, so it cannot see a dead import. **`bump-deps --self-test`**. Strict — the tree was clean when each landed, so a new finding is a regression. |
+| `workflows` | ubuntu | Audits the CI configuration itself, which nothing used to check. **`actionlint`** for correctness — and it runs shellcheck over `run:` blocks, ~200 lines of shell no other job sees. **`zizmor`** for security. Single-platform on purpose: `lint`/`test` are matrixed because the `.chezmoiscripts/{darwin,linux}` templates render per-OS, whereas workflow analysis is platform-independent. Ends with a **canary** — see below. |
 
 **Why `zsh -n` is a separate gate.** shellcheck cannot parse zsh, so nothing else in CI looks at the ~25 files sourced into every interactive shell. That mattered more than it sounds: a parse error in a topic file does **not** hard-fail the shell — zsh reports it and carries on, silently dropping every alias and setting after the error. So a break would ship green and later present as "some of my aliases disappeared". The file list is derived from globs, not hardcoded, so a new topic file is covered automatically. `-n` parses without executing, which is the only safe option given these files alter `PATH`, install hooks and start the prompt.
 | `test` | macos + ubuntu | `./tests/run` — bats over the shell, stdlib `unittest` over `bin/bump-deps`. bats-core is pinned to an exact release tarball **with its sha256 verified**, for the same reason shellcheck is pinned: Ubuntu's apt `bats` trails Homebrew's by several minors and they disagree about which helpers exist. Also asserts nothing **skipped** — a missing `jq`/`zsh`/`chezmoi` makes tests skip rather than fail (deliberate, so the suite runs on a half-configured laptop), but on a runner a skip means the job silently tested less than it claims. |
-| `secrets` | ubuntu | `gitleaks` over full history (`fetch-depth: 0`). |
+| `secrets` | ubuntu | `gitleaks` over full history (`fetch-depth: 0`). `GITLEAKS_ENABLE_COMMENTS: false` — the action posts PR comments by default, which needs `pull-requests: write`; the job already fails the build on a finding, so the comment adds nothing a red check doesn't. |
 | `apply` | macos + ubuntu | Copies **the checkout** into `~/.local/share/chezmoi` and runs `install.sh`, then applies a second time and asserts no drift. |
 | `bootstrap` | macos + ubuntu | Push-only. Tests the documented `curl \| bash` path, which necessarily clones `master` from GitHub, so it can only be meaningful post-merge. Needs `DOTFILES_FORCE_RESET=1`. |
 
-Two things worth preserving:
+**Why the `workflows` job ends with a canary.** zizmor's four most valuable audits — the ones that inspect a commit pin's provenance — are *online*: they need a `GH_TOKEN`. Without one they do not complain. zizmor reports nothing and exits 0, so a job that lost its token would keep going green while checking none of the supply-chain properties it was added for. `tests/fixtures/zizmor/canary.yml` pins a real commit under a deliberately wrong version comment, and the job fails unless `ref-version-mismatch` fires on it. Same reasoning as the `test` job's *Assert nothing was skipped* step. Do not "fix" that fixture's comment — correcting it turns the canary into a check that can never fail.
+
+Three things worth preserving:
 
 - **`apply` tests the checkout, not the remote.** It used to run `install_dotfiles.sh`, which clones `master` from GitHub and discards `actions/checkout` output entirely — so pull requests never tested their own code and fork PRs silently validated `master`.
 - **The drift gate is `chezmoi status --exclude=scripts`, not `chezmoi verify`.** The four plain `run_after_` scripts are meant to run on every apply, so they are permanently "pending" and bare `chezmoi verify` can never exit 0.
+- **`shellcheck` is installed twice** — in `lint`, and again in `workflows` where actionlint shells out to it. That is why its `bump-deps` pin uses `occurrences: "all"`. The alternative, ubuntu-latest's preinstalled shellcheck, is unpinned, which is the drift `lint` pins against in the first place.
 
 CI cannot catch macOS-Homebrew-on-`PATH` bugs: GitHub's macOS runners ship Homebrew already on `PATH`, which is exactly why the Apple Silicon bootstrap could break undetected. Test that on a real clean machine or VM.

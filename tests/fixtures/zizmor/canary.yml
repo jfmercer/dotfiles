@@ -1,0 +1,33 @@
+# A deliberately broken workflow. It is never executed -- it lives here, and not
+# under .github/workflows/, precisely so GitHub does not try to run it.
+#
+# Its whole job is to prove that zizmor's *online* audits actually ran in CI.
+# Those audits (impostor-commit, ref-version-mismatch, stale-action-refs,
+# known-vulnerable-actions) need a GitHub token, and when they don't get one they
+# do not complain -- zizmor simply reports nothing and exits 0. So a workflow job
+# that dropped its GH_TOKEN would keep reporting green while checking none of the
+# supply-chain properties we added it for.
+#
+# The pin below is real: 3d3c42e5... is genuinely the commit behind
+# actions/checkout v7.0.1. The version comment is a lie. That must make
+# ref-version-mismatch fire, and the `workflows` job in ci.yaml fails if it
+# doesn't.
+#
+# Do not "fix" the comment. Correcting it to v7.0.1 silences the finding, which
+# turns the canary into a check that can never fail -- see tests/README.md.
+name: 'zizmor canary (never run)'
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    name: canary
+    runs-on: ubuntu-latest
+    steps:
+      # v7.0.1's commit, mislabeled as v5.0.0 on purpose.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.0
+        with:
+          persist-credentials: false
