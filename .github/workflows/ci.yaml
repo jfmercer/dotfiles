@@ -13,6 +13,14 @@ concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
   cancel-in-progress: true
 
+# Least privilege by default. Without this block every job inherits the
+# repository's default_workflow_permissions, which is "write" -- so `bootstrap`
+# (which pipes a curl'd script into bash) and `apply` (which executes this whole
+# tree) were handed a read/write GITHUB_TOKEN they have no use for. Jobs that
+# need more must opt in explicitly; none currently do.
+permissions:
+  contents: read
+
 jobs:
   # Lint the shell we own. Deliberately strict: the tree is clean at the time
   # this was added, so any new finding is a regression.
@@ -26,7 +34,20 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v7.0.1
+      # Pinned to a commit, not the v7.0.1 tag. Same reasoning as
+      # .chezmoiexternal.yaml: a tag can be force-moved by anyone who can push
+      # to the action's repo, a commit cannot. The hash is also what makes the
+      # pin auditable at all -- zizmor's impostor-commit, ref-version-mismatch
+      # and stale-action-refs checks have nothing to inspect on a tag pin. The
+      # trailing comment is not decoration: ref-version-mismatch verifies it
+      # against the commit, and `bump-deps` rewrites both together.
+      #
+      # persist-credentials: false keeps the token out of .git/config. It
+      # matters most in `apply`, which copies this checkout -- .git included --
+      # into ~/.local/share/chezmoi.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Pinned to one version from upstream releases rather than each platform's
       # package manager. Ubuntu's apt shellcheck lags Homebrew's by several
@@ -131,6 +152,33 @@ jobs:
           # Don't leave byte-cache behind for the drift check in the apply job.
           rm -rf bin/__pycache__ scripts/__pycache__
 
+      # py_compile above only proves the file parses. ruff catches what parsing
+      # cannot: dead imports (it found two), plus the bandit-derived `S` rules.
+      # Pinned and tracked by `bump-deps`, like shellcheck; note the tag has no
+      # `v` prefix upstream.
+      - name: Install ruff
+        env:
+          RUFF_VERSION: 0.16.0
+        run: |
+          case "$RUNNER_OS-$(uname -m)" in
+            macOS-arm64)   target=aarch64-apple-darwin ;;
+            macOS-x86_64)  target=x86_64-apple-darwin ;;
+            Linux-aarch64) target=aarch64-unknown-linux-gnu ;;
+            *)             target=x86_64-unknown-linux-gnu ;;
+          esac
+          url="https://github.com/astral-sh/ruff/releases/download/${RUFF_VERSION}/ruff-${target}.tar.gz"
+          curl -fsSL "$url" | tar -xzf - -C /tmp
+          sudo install "/tmp/ruff-${target}/ruff" /usr/local/bin/ruff
+          ruff --version
+
+      # S603/S607 flag every subprocess call and every command resolved via PATH.
+      # bump-deps does both deliberately -- it shells out to `gh`, `gpg`, `shasum`
+      # and `chezmoi` by name, which is the point -- so they are ignored here
+      # rather than silenced with a noqa on each call site. The narrower S310
+      # suppressions stay inline where they are.
+      - name: Lint Python with ruff
+        run: ruff check --select=E9,F,S --ignore=S603,S607 bin/bump-deps tests/python/
+
       - name: Self-test bin/bump-deps
         run: python3 bin/bump-deps --self-test
 
@@ -160,6 +208,99 @@ jobs:
           done < <(find .chezmoiscripts -name '*.tmpl')
           exit $rc
 
+  # Audits the CI configuration itself, which nothing used to look at. Two
+  # complementary tools: actionlint for correctness (workflow schema, expression
+  # syntax, matrix references -- and it shellchecks `run:` blocks, ~200 lines of
+  # shell that no other job sees), zizmor for security (token scope, credential
+  # persistence, template injection, action provenance).
+  #
+  # ubuntu-latest only, deliberately, unlike `lint` and `test`: those are matrixed
+  # because the .chezmoiscripts/{darwin,linux} templates render per-OS, whereas
+  # workflow analysis is platform-independent. One runner also means one pinned
+  # version per tool instead of two.
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # actionlint shells out to shellcheck for `run:` blocks and silently skips
+      # that rule if it is missing. ubuntu-latest ships a shellcheck, but an
+      # unpinned one -- the exact drift the `lint` job pins against -- so install
+      # the same version here rather than inherit whatever the image has.
+      - name: Install shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.11.0
+        run: |
+          url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL "$url" | tar -xJf - -C /tmp
+          sudo install "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+
+      # Both tools are pinned to an exact release and tracked by `bump-deps`.
+      # No checksum, matching the shellcheck precedent rather than the bats one:
+      # bats pins a sha256 because GitHub *source archives* are generated on
+      # demand and have been regenerated before, whereas these are immutable
+      # uploaded release binaries.
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: v1.7.12
+        run: |
+          v="${ACTIONLINT_VERSION#v}"
+          url="https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/actionlint_${v}_linux_amd64.tar.gz"
+          curl -fsSL "$url" | tar -xzf - -C /tmp actionlint
+          sudo install /tmp/actionlint /usr/local/bin/actionlint
+          actionlint --version
+
+      - name: Install zizmor
+        env:
+          ZIZMOR_VERSION: v1.28.0
+        run: |
+          url="https://github.com/zizmorcore/zizmor/releases/download/${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL "$url" | tar -xzf - -C /tmp zizmor
+          sudo install /tmp/zizmor /usr/local/bin/zizmor
+          zizmor --version
+
+      # Explicit paths, not a bare directory: if a glob ever stops matching, an
+      # empty file list would otherwise read as "clean".
+      - name: actionlint
+        run: actionlint -verbose .github/workflows/ci.yaml .github/workflows/deps.yaml
+
+      # GH_TOKEN is not optional. Without it zizmor drops every online audit --
+      # impostor-commit, ref-version-mismatch, stale-action-refs,
+      # known-vulnerable-actions -- and still exits 0. The canary below is what
+      # notices if that ever happens.
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: zizmor .github/workflows/
+
+      # Prove the online audits actually ran, rather than trusting that they did.
+      # The fixture pins a real commit under a deliberately wrong version comment,
+      # so ref-version-mismatch must fire; if it doesn't, either the token is
+      # missing or the audit regressed, and in both cases the step above became
+      # decoration. --format=json disables zizmor's 11+ exit codes, so this
+      # inspects the output rather than the status.
+      - name: Assert zizmor's online audits ran
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          zizmor --format=json tests/fixtures/zizmor/canary.yml > /tmp/canary.json
+          python3 - <<'PY'
+          import json, sys
+
+          with open("/tmp/canary.json") as fh:
+              idents = {f["ident"] for f in json.load(fh)}
+          if "ref-version-mismatch" not in idents:
+              sys.exit(
+                  "canary did not fire: expected ref-version-mismatch, got "
+                  f"{sorted(idents) or 'nothing'}.\n"
+                  "zizmor's online audits are not running -- check GH_TOKEN."
+              )
+          print("canary fired; online audits are live")
+          PY
+
   # Behavioral tests, as opposed to the parse-only checks in `lint`. Matrixed
   # for the same reason: bin/secret is macOS-facing but must still be provably
   # correct when its `security` calls are stubbed, and the template suite renders
@@ -171,7 +312,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Pinned to an upstream release rather than each platform's package
       # manager, for the same reason shellcheck is: Ubuntu's apt `bats` trails
@@ -248,13 +391,19 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # gitleaks needs history, not just the tip commit.
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3.0.0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This action comments on PRs by default, which needs
+          # pull-requests: write. The job already fails the build on a finding,
+          # so the comment adds nothing a red check doesn't -- and declining it
+          # keeps this job at contents: read.
+          GITLEAKS_ENABLE_COMMENTS: "false"
 
   # Apply the tree from THIS commit. Previously this job cloned master from
   # GitHub and discarded the checkout, so pull requests never tested their own
@@ -266,7 +415,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Stage the checkout as the chezmoi source directory
         run: |
@@ -278,7 +429,11 @@ jobs:
         # source directory with `command -v -- "$0"`, which only resolves an
         # absolute path when the file is executable. This matches how
         # scripts/install_dotfiles.sh execs it.
-        run: "$HOME/.local/share/chezmoi/install.sh"
+        #
+        # Single-quoted on the YAML side so the double quotes survive into the
+        # shell. Written as "$HOME/..." the YAML parser consumes the quotes and
+        # bash receives the path bare, splitting it on any space in $HOME.
+        run: '"$HOME/.local/share/chezmoi/install.sh"'
 
       - name: Apply a second time (idempotence)
         run: |
@@ -323,7 +478,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Test the documented curl | bash bootstrap
         env:
           # GITHUB_HEAD_REF is set only for pull_request events; fall back to the

@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Report and bump the pinned dependencies scattered across this repo.
 
-Pins live in four different files with no shared mechanism, and Dependabot reads
+Pins live in five different files with no shared mechanism, and Dependabot reads
 none of them. This walks the lot, tells you what is stale, and bumps what is
 safe to bump automatically.
 
-The important idea: a pin is not always a version. There are four classes, and
+The important idea: a pin is not always a version. There are five classes, and
 treating them uniformly would be actively harmful -- auto-updating a GPG key
 fingerprint, for instance, would defeat the entire reason it is pinned.
 
   VERSION  A release tag. Resolve the latest stable release and rewrite it.
            Fully automatic.
+  ACTION   A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment
+           beside it. Both halves move together: the SHA is what actually runs,
+           the comment is what a human reads, and a comment that disagrees with
+           its SHA is worse than no comment at all. Fully automatic.
   EXTERNAL A commit SHA plus a sha256 in .chezmoiexternal.yaml. Bumping moves to
            current master and recomputes the checksum, which means pulling
            upstream code nobody has read -- so each one is confirmed
@@ -25,7 +29,7 @@ fingerprint, for instance, would defeat the entire reason it is pinned.
 Usage:
   bump-deps                    Report every pin: class, current, latest, status
   bump-deps --check            Terse; exit 1 if anything needs action (CI mode)
-  bump-deps --apply            Bump VERSION pins; confirm each EXTERNAL
+  bump-deps --apply            Bump VERSION and ACTION pins; confirm each EXTERNAL
   bump-deps --apply --externals-all   ... without per-external confirmation
   bump-deps --only NAME        Restrict to one pin (repeatable)
   bump-deps --accept NAME      Accept a changed CONTENT pin
@@ -39,18 +43,17 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CI = ".github/workflows/ci.yaml"
+DEPS = ".github/workflows/deps.yaml"
 LINUX = ".chezmoiscripts/linux/run_onchange_before_10_installs.sh.tmpl"
 EXTERNALS = ".chezmoiexternal.yaml"
 INSTALL = "install.sh"
@@ -75,11 +78,14 @@ VERSION_PINS = [
         "strip_v": False,
     },
     {
+        # Installed twice in ci.yaml -- once in `lint`, once in `workflows`,
+        # where actionlint shells out to it. Both must move together, hence
+        # "all" rather than 1.
         "name": "shellcheck",
         "file": CI,
         "pattern": r"SHELLCHECK_VERSION: (\S+)",
         "repo": "koalaman/shellcheck",
-        "occurrences": 1,
+        "occurrences": "all",
         "strip_v": False,
     },
     {
@@ -95,19 +101,30 @@ VERSION_PINS = [
         "strip_v": False,
     },
     {
-        "name": "actions/checkout",
+        "name": "zizmor",
         "file": CI,
-        "pattern": r"actions/checkout@(\S+)",
-        "repo": "actions/checkout",
-        "occurrences": "all",
+        "pattern": r"ZIZMOR_VERSION: (\S+)",
+        "repo": "zizmorcore/zizmor",
+        "occurrences": 1,
         "strip_v": False,
     },
     {
-        "name": "gitleaks-action",
+        "name": "actionlint",
         "file": CI,
-        "pattern": r"gitleaks/gitleaks-action@(\S+)",
-        "repo": "gitleaks/gitleaks-action",
-        "occurrences": "all",
+        "pattern": r"ACTIONLINT_VERSION: (\S+)",
+        "repo": "rhysd/actionlint",
+        "occurrences": 1,
+        "strip_v": False,
+    },
+    {
+        # ruff tags releases as X.Y.Z with no leading v, so the pin stores the
+        # tag verbatim and strip_v stays False -- the opposite of lazygit below,
+        # which is tagged vX.Y.Z but pinned without the v.
+        "name": "ruff",
+        "file": CI,
+        "pattern": r"RUFF_VERSION: (\S+)",
+        "repo": "astral-sh/ruff",
+        "occurrences": 1,
         "strip_v": False,
     },
     {
@@ -117,6 +134,40 @@ VERSION_PINS = [
         "repo": "jesseduffield/lazygit",
         "occurrences": 1,
         "strip_v": True,
+    },
+]
+
+# --------------------------------------------------------------------------
+# Actions are pinned to a commit, not a tag. A tag can be force-moved by anyone
+# able to push to the action's repo; a commit is content-addressed. The same
+# argument .chezmoiexternal.yaml makes for zsh plugins applies with more force
+# here, because these run with a GITHUB_TOKEN.
+#
+# The hash is also what makes the pin auditable: zizmor's impostor-commit,
+# ref-version-mismatch and stale-action-refs audits have nothing to inspect on a
+# tag pin. ref-version-mismatch in particular checks the `# vX.Y.Z` comment
+# against the commit, which is why this class rewrites both together rather than
+# leaving the comment to rot into a lie.
+#
+#   files    a list, not a single path: actions/checkout is used by both
+#            workflows, and rewriting one file while leaving the other behind
+#            would leave the tree inconsistent while still reporting "current".
+#   pattern  exactly two capture groups, (commit, version comment), in that
+#            order. This is why ACTION pins use replace_action_pin() instead of
+#            replace_value(), whose contract is a single group.
+# --------------------------------------------------------------------------
+ACTION_PINS = [
+    {
+        "name": "actions/checkout",
+        "files": [CI, DEPS],
+        "pattern": r"actions/checkout@([0-9a-f]{40}) # (v?\d+\.\d+\.\d+)",
+        "repo": "actions/checkout",
+    },
+    {
+        "name": "gitleaks-action",
+        "files": [CI],
+        "pattern": r"gitleaks/gitleaks-action@([0-9a-f]{40}) # (v?\d+\.\d+\.\d+)",
+        "repo": "gitleaks/gitleaks-action",
     },
 ]
 
@@ -193,6 +244,24 @@ def head_sha(repo: str) -> str:
     return gh_text(f"repos/{repo}/commits/HEAD", "--jq", ".sha")
 
 
+def tag_commit(repo: str, tag: str) -> str:
+    """Resolve a tag to the commit it points at.
+
+    Both actions pinned here use lightweight tags today, where the ref's object
+    *is* the commit. Annotated tags point at a tag object instead, which has to
+    be dereferenced -- handled rather than assumed, because whether a project
+    signs its release tags is upstream's choice to change, and getting this wrong
+    would pin a tag object's SHA that no checkout could ever resolve.
+    """
+    kind = gh_text(f"repos/{repo}/git/ref/tags/{tag}", "--jq", ".object.type")
+    sha = gh_text(f"repos/{repo}/git/ref/tags/{tag}", "--jq", ".object.sha")
+    if kind == "tag":
+        sha = gh_text(f"repos/{repo}/git/tags/{sha}", "--jq", ".object.sha")
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise Problem(f"{repo}: {tag} resolved to {sha!r}, not a commit SHA")
+    return sha
+
+
 def commit_date(repo: str, sha: str) -> str:
     d = gh_text(f"repos/{repo}/commits/{sha}", "--jq", ".commit.committer.date", required=False)
     return d.split("T")[0] if d else "unknown"
@@ -265,6 +334,54 @@ def replace_value(pin: dict, old: str, new: str) -> int:
         raise Problem(f"{pin['name']}: nothing replaced in {pin['file']}")
     write(pin["file"], updated)
     return n
+
+
+def current_action_pin(pin: dict) -> tuple[str, str]:
+    """Return (commit, version comment) for an ACTION pin, across all its files.
+
+    Every occurrence in every file must agree. A tree where one workflow pins a
+    different commit than another is exactly the drift this class exists to
+    prevent, so it aborts rather than picking one and rewriting the rest.
+    """
+    found: list[tuple[str, str]] = []
+    for rel in pin["files"]:
+        hits = re.findall(pin["pattern"], read(rel))
+        if not hits:
+            raise Problem(f"{pin['name']}: pattern not found in {rel}")
+        found.extend(hits)
+    if len(set(found)) > 1:
+        raise Problem(f"{pin['name']}: inconsistent pins across {pin['files']}: {sorted(set(found))}")
+    return found[0]
+
+
+def replace_action_pin(pin: dict, new_sha: str, new_tag: str) -> int:
+    """Rewrite an ACTION pin's commit and version comment together.
+
+    Deliberately not replace_value(): that rebuilds the match around a single
+    capture group, and splitting this into two passes would leave the file
+    momentarily holding a SHA whose comment disagrees -- the precise state
+    zizmor's ref-version-mismatch audit exists to catch.
+    """
+    pattern = re.compile(pin["pattern"])
+    total = 0
+    for rel in pin["files"]:
+        text = read(rel)
+
+        def sub(m: re.Match) -> str:
+            whole = m.group(0)
+            whole = whole.replace(m.group(1), new_sha, 1)
+            # Replace the comment last and anchor on the tail, so a version
+            # string that happens to occur inside the SHA cannot be hit.
+            head, sep, tail = whole.rpartition(m.group(2))
+            return head + new_tag + tail if sep else whole
+
+        updated, n = pattern.subn(sub, text)
+        if n:
+            write(rel, updated)
+        total += n
+    if total == 0:
+        raise Problem(f"{pin['name']}: nothing replaced in {pin['files']}")
+    return total
 
 
 # --------------------------------------------------------- externals parsing
@@ -373,16 +490,33 @@ def check_invariants() -> list[str]:
     if "master.tar.gz" in text or "/HEAD/" in text:
         problems.append(f"{EXTERNALS}: an entry is tracking a moving ref instead of a pin")
 
-    # 3. Actions must be pinned to an exact release, not a floating major tag.
-    for pin in VERSION_PINS:
-        if "/" not in pin["name"] and pin["name"] != "gitleaks-action":
-            continue
-        val = current_value(pin)
-        if not re.match(r"^v?\d+\.\d+\.\d+", val):
-            problems.append(
-                f"{pin['name']} is pinned to '{val}', a floating tag; "
-                "use an exact release so the workflow is reproducible"
-            )
+    # 3. Actions must be pinned to a commit with a matching version comment.
+    #    This used to demand the opposite -- an exact vX.Y.Z tag, rejecting a SHA
+    #    as a "floating tag". That had it backwards: a tag can be force-moved, and
+    #    a tag pin gives zizmor nothing to audit. See ACTION_PINS.
+    for pin in ACTION_PINS:
+        for rel in pin["files"]:
+            text = read(rel)
+            # Every `uses:` of this action must be well-formed, not merely one of
+            # them. Searching the file as a whole would report a clean tree as
+            # long as a single correct pin existed somewhere in it, so reverting
+            # one of six checkouts to a tag would pass unnoticed.
+            seen = False
+            for m in re.finditer(r"^[ \t]*-?[ \t]*uses:[ \t]*(\S+)", text, re.M):
+                if not m.group(1).startswith(pin["repo"] + "@"):
+                    continue
+                seen = True
+                end = text.find("\n", m.end())
+                line = text[m.start() : end if end != -1 else len(text)]
+                if not re.search(pin["pattern"], line):
+                    ref = m.group(1).split("@", 1)[1]
+                    problems.append(
+                        f"{rel}: {pin['name']} is pinned to '{ref}'; use a "
+                        "40-character commit SHA with a '# vX.Y.Z' comment beside "
+                        "it, so the pin is immutable and auditable"
+                    )
+            if not seen:
+                problems.append(f"{rel}: {pin['name']} pin not found")
     return problems
 
 
@@ -410,6 +544,26 @@ def gather(only: set[str]) -> list[Row]:
         latest = tag.lstrip("v") if pin["strip_v"] else tag
         rows.append(
             Row(pin["name"], "VERSION", cur, latest, "current" if cur == latest else "stale")
+        )
+
+    for pin in ACTION_PINS:
+        if only and pin["name"] not in only:
+            continue
+        cur_sha, cur_tag = current_action_pin(pin)
+        tag = latest_release(pin["repo"])
+        sha = tag_commit(pin["repo"], tag)
+        # Compare on the commit, not the comment: the SHA is what runs. A pin
+        # whose comment is stale but whose commit is current is still wrong, and
+        # showing the tag in `detail` is what makes that legible in the table.
+        rows.append(
+            Row(
+                pin["name"],
+                "ACTION",
+                cur_sha[:12],
+                sha[:12],
+                "current" if (cur_sha, cur_tag) == (sha, tag) else "stale",
+                f"{cur_tag} -> {tag}" if cur_tag != tag else cur_tag,
+            )
         )
 
     for ext in parse_externals():
@@ -511,6 +665,22 @@ def apply_versions(rows: list[Row], dry: bool) -> int:
     return changed
 
 
+def apply_actions(rows: list[Row], dry: bool) -> int:
+    changed = 0
+    for pin in ACTION_PINS:
+        row = next((r for r in rows if r.name == pin["name"] and r.klass == "ACTION"), None)
+        if row is None or not row.actionable:
+            continue
+        tag = latest_release(pin["repo"])
+        sha = tag_commit(pin["repo"], tag)
+        print(f"  {pin['name']}: {row.current}... -> {sha[:12]}... ({tag})")
+        if not dry:
+            n = replace_action_pin(pin, sha, tag)
+            print(f"    {', '.join(pin['files'])} ({n} occurrence(s))")
+        changed += 1
+    return changed
+
+
 def apply_externals(rows: list[Row], confirm: bool) -> int:
     changed = 0
     for ext in parse_externals():
@@ -566,6 +736,57 @@ def verify_externals() -> bool:
 
 
 # ------------------------------------------------------------------ self-test
+
+
+def self_test_actions() -> int:
+    """Prove replace_action_pin rewrites both halves of an ACTION pin, and only those.
+
+    Separate from self_test() because ACTION pins span several files and carry two
+    capture groups, so neither the single-file backup nor the single-group
+    assertion below applies to them.
+    """
+    failures = 0
+    sentinel_sha, sentinel_tag = "0" * 40, "v9.9.9"
+    for pin in ACTION_PINS:
+        backups = {rel: read(rel) for rel in pin["files"]}
+        try:
+            cur_sha, cur_tag = current_action_pin(pin)
+            n = replace_action_pin(pin, sentinel_sha, sentinel_tag)
+            bad = False
+            for rel, before in backups.items():
+                after = read(rel)
+                if before.count("\n") != after.count("\n"):
+                    print(f"  FAIL {pin['name']}: line count changed in {rel}")
+                    bad = True
+                    continue
+                for a, b in zip(before.splitlines(), after.splitlines()):
+                    if a == b:
+                        continue
+                    want = a.replace(cur_sha, sentinel_sha).replace(cur_tag, sentinel_tag)
+                    if want != b:
+                        print(f"  FAIL {pin['name']}: {rel} changed more than the pin:\n    {b}")
+                        bad = True
+            # Both halves must actually have moved. A rewrite that updated the
+            # commit and left the comment behind is the exact failure this class
+            # exists to prevent, so assert it rather than trusting the diff.
+            # Re-read through current_action_pin rather than grepping the files:
+            # the old version string also appears in prose comments that are
+            # correctly left alone, and it doubles as proof that the rewritten
+            # text still matches the pattern.
+            if current_action_pin(pin) != (sentinel_sha, sentinel_tag):
+                print(f"  FAIL {pin['name']}: pin does not read back as rewritten")
+                bad = True
+            if not bad:
+                print(f"  ok   {pin['name']}: {n} pin(s) across {len(pin['files'])} file(s)")
+            failures += bool(bad)
+        finally:
+            for rel, text in backups.items():
+                write(rel, text)
+        for rel, text in backups.items():
+            if read(rel) != text:
+                print(f"  FAIL {pin['name']}: restore did not round-trip {rel}")
+                failures += 1
+    return failures
 
 
 def self_test() -> int:
@@ -638,7 +859,7 @@ def main() -> int:
         epilog="Run with no arguments for a status table.",
     )
     ap.add_argument("--check", action="store_true", help="terse; exit 1 if action needed")
-    ap.add_argument("--apply", action="store_true", help="bump VERSION pins and confirmed EXTERNALs")
+    ap.add_argument("--apply", action="store_true", help="bump VERSION/ACTION pins and confirmed EXTERNALs")
     ap.add_argument("--externals-all", action="store_true", help="skip per-external confirmation")
     ap.add_argument("--only", action="append", default=[], metavar="NAME", help="restrict to one pin")
     ap.add_argument("--accept", action="append", default=[], metavar="NAME", help="accept a CONTENT change")
@@ -648,6 +869,7 @@ def main() -> int:
     if args.self_test:
         print("Self-test: in-place editing")
         n = self_test()
+        n += self_test_actions()
         print("\nPASS" if n == 0 else f"\nFAIL ({n} problem(s))")
         return 1 if n else 0
 
@@ -706,7 +928,7 @@ def main() -> int:
     if not args.apply:
         # Distinguish what --apply can actually fix from what needs a human.
         # Telling someone to "--apply" a rotated GPG fingerprint would be wrong.
-        bumpable = [r for r in rows if r.actionable and r.klass in ("VERSION", "EXTERNAL")]
+        bumpable = [r for r in rows if r.actionable and r.klass in ("VERSION", "ACTION", "EXTERNAL")]
         manual = [r for r in rows if r.actionable and r.klass in ("CONTENT", "ANCHOR")]
         if bumpable:
             print(f"\n{len(bumpable)} pin(s) bumpable: re-run with --apply.")
@@ -719,6 +941,7 @@ def main() -> int:
 
     print("\nApplying...")
     changed = apply_versions(rows, dry=False)
+    changed += apply_actions(rows, dry=False)
     changed += apply_externals(rows, confirm=not args.externals_all)
     if changed == 0:
         print("  nothing to do")

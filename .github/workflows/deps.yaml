@@ -13,13 +13,22 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # This job opens, edits and closes the single tracking issue below.
+      issues: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      # Pinned to a commit, not the v7.0.1 tag, for the reason .chezmoiexternal.yaml
+      # gives: a tag can be force-moved, a commit cannot. The hash is also what
+      # lets zizmor check this pin's provenance at all -- see CLAUDE.md.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Don't leave the token in .git/config after checkout.
+          persist-credentials: false
 
       - name: Check pins
         id: check
@@ -48,6 +57,11 @@ jobs:
             title="Dependency check: pins are stale"
           fi
 
+          # This group writes Markdown into the issue body, so the backticks
+          # inside single quotes below are meant to arrive literally rather than
+          # be expanded -- which is precisely what SC2016 warns about. Scoped to
+          # the compound command rather than repeated on each echo.
+          # shellcheck disable=SC2016
           {
             echo "\`bin/bump-deps --check\` reported work to do on $(date -u +%Y-%m-%d)."
             echo

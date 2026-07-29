@@ -14,9 +14,25 @@ from __future__ import annotations
 
 import unittest
 
-from helper import bump_deps, fixture_repo, pin, read
+from helper import (
+    ALL_REGISTRIES,
+    CHECKOUT_SHA,
+    GITLEAKS_SHA,
+    SINGLE_GROUP_REGISTRIES,
+    bump_deps,
+    fixture_repo,
+    pin,
+    read,
+)
 
 Problem = bump_deps.Problem
+
+# What the fixture workflows pin, so "upstream has not moved" is the default and a
+# test wanting drift has to say so.
+FIXTURE_ACTION_SHAS = {
+    "actions/checkout": CHECKOUT_SHA,
+    "gitleaks/gitleaks-action": GITLEAKS_SHA,
+}
 
 
 class CurrentValue(unittest.TestCase):
@@ -29,9 +45,10 @@ class CurrentValue(unittest.TestCase):
             self.assertEqual(bump_deps.current_value(pin("lazygit")), "0.58.0")
 
     def test_occurrences_all_accepts_repeats(self):
-        # actions/checkout appears twice in the fixture CI file.
+        # shellcheck is installed twice in the fixture CI file -- once in `lint`,
+        # once in `workflows`, mirroring the real tree.
         with fixture_repo():
-            self.assertEqual(bump_deps.current_value(pin("actions/checkout")), "v7.0.1")
+            self.assertEqual(bump_deps.current_value(pin("shellcheck")), "v0.11.0")
 
     def test_missing_pattern_is_a_problem(self):
         with fixture_repo(**{"install.sh": "#!/bin/sh\necho nothing pinned here\n"}):
@@ -40,25 +57,25 @@ class CurrentValue(unittest.TestCase):
             self.assertIn("pattern not found", str(ctx.exception))
 
     def test_inconsistent_values_are_a_problem(self):
-        # Two different checkout versions in one workflow: bumping either one
+        # Two different shellcheck versions in one workflow: bumping either one
         # would leave the other behind, so this must abort rather than pick one.
         broken = read_fixture_ci().replace(
-            "gitleaks/gitleaks-action@v3.0.0", "actions/checkout@v6.0.0"
+            "ACTIONLINT_VERSION: v1.7.12", "SHELLCHECK_VERSION: v0.9.0"
         )
         with fixture_repo(**{".github/workflows/ci.yaml": broken}):
             with self.assertRaises(Problem) as ctx:
-                bump_deps.current_value(pin("actions/checkout"))
+                bump_deps.current_value(pin("shellcheck"))
             self.assertIn("inconsistent values", str(ctx.exception))
 
     def test_occurrence_count_mismatch_is_a_problem(self):
         # This guard is what stops a silent edit of the wrong number of lines.
         doubled = read_fixture_ci().replace(
-            "          SHELLCHECK_VERSION: v0.11.0",
-            "          SHELLCHECK_VERSION: v0.11.0\n          SHELLCHECK_VERSION: v0.11.0",
+            "          ZIZMOR_VERSION: v1.28.0",
+            "          ZIZMOR_VERSION: v1.28.0\n          ZIZMOR_VERSION: v1.28.0",
         )
         with fixture_repo(**{".github/workflows/ci.yaml": doubled}):
             with self.assertRaises(Problem) as ctx:
-                bump_deps.current_value(pin("shellcheck"))
+                bump_deps.current_value(pin("zizmor"))
             self.assertIn("expected 1 occurrence(s)", str(ctx.exception))
 
 
@@ -110,9 +127,9 @@ class ReplaceValue(unittest.TestCase):
 
     def test_replaces_every_occurrence_for_all_pins(self):
         with fixture_repo() as repo:
-            n = bump_deps.replace_value(pin("actions/checkout"), "v7.0.1", "v8.0.0")
+            n = bump_deps.replace_value(pin("shellcheck"), "v0.11.0", "v0.12.0")
             self.assertEqual(n, 2)
-            self.assertNotIn("v7.0.1", read(repo, ".github/workflows/ci.yaml"))
+            self.assertNotIn("v0.11.0", read(repo, ".github/workflows/ci.yaml"))
 
     def test_line_count_never_changes(self):
         with fixture_repo() as repo:
@@ -298,26 +315,116 @@ class CheckInvariants(unittest.TestCase):
             problems = bump_deps.check_invariants()
         self.assertTrue(any("moving ref" in p for p in problems), problems)
 
+    # The next four invert what this file used to assert. Until hash pinning landed
+    # the check demanded an exact vX.Y.Z tag and reported a commit SHA as a
+    # "floating tag" -- which had it backwards, since a tag can be force-moved and a
+    # tag pin leaves zizmor's provenance audits nothing to inspect.
+
     def test_an_action_on_a_floating_major_tag_is_caught(self):
-        floating = FIXTURE_CI.replace("actions/checkout@v7.0.1", "actions/checkout@v7")
+        floating = FIXTURE_CI.replace(f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", "actions/checkout@v7")
         with fixture_repo(**{".github/workflows/ci.yaml": floating}):
             problems = bump_deps.check_invariants()
-        self.assertTrue(any("floating tag" in p for p in problems), problems)
+        self.assertTrue(any("commit SHA" in p for p in problems), problems)
+
+    def test_an_action_on_an_exact_tag_is_still_caught(self):
+        # An exact release tag is no longer good enough: v7.0.1 can be moved to
+        # point somewhere else, and the pin would follow it.
+        tagged = FIXTURE_CI.replace(f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", "actions/checkout@v7.0.1")
+        with fixture_repo(**{".github/workflows/ci.yaml": tagged}):
+            problems = bump_deps.check_invariants()
+        self.assertTrue(any("commit SHA" in p for p in problems), problems)
 
     def test_a_gitleaks_action_on_a_floating_tag_is_caught(self):
-        floating = FIXTURE_CI.replace("gitleaks-action@v3.0.0", "gitleaks-action@v3")
+        floating = FIXTURE_CI.replace(f"gitleaks-action@{GITLEAKS_SHA} # v3.0.0", "gitleaks-action@v3")
         with fixture_repo(**{".github/workflows/ci.yaml": floating}):
             problems = bump_deps.check_invariants()
-        self.assertTrue(any("floating tag" in p for p in problems), problems)
+        self.assertTrue(any("commit SHA" in p for p in problems), problems)
 
-    def test_an_action_pinned_to_a_commit_sha_is_reported(self):
-        # A 40-char SHA is arguably the strongest pin of all, but it does not match
-        # the vX.Y.Z shape the check demands. Documented here so the behavior is a
-        # decision on record rather than a surprise the first time someone tries it.
-        sha_pinned = FIXTURE_CI.replace("actions/checkout@v7.0.1", "actions/checkout@" + "a" * 40)
-        with fixture_repo(**{".github/workflows/ci.yaml": sha_pinned}):
+    def test_a_commit_sha_without_a_version_comment_is_caught(self):
+        # The comment is load-bearing: it is what a human reads instead of the
+        # hash, and zizmor's ref-version-mismatch audit verifies it. A bare SHA is
+        # immutable but unreadable, so it does not satisfy the invariant either.
+        bare = FIXTURE_CI.replace(
+            f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", f"actions/checkout@{CHECKOUT_SHA}"
+        )
+        with fixture_repo(**{".github/workflows/ci.yaml": bare}):
             problems = bump_deps.check_invariants()
-        self.assertTrue(any("floating tag" in p for p in problems), problems)
+        self.assertTrue(any("vX.Y.Z" in p for p in problems), problems)
+
+    def test_one_bad_pin_among_several_good_ones_is_caught(self):
+        # Regression: the check used to re.search the file as a whole, so it passed
+        # as long as *one* well-formed pin existed anywhere in it. ci.yaml pins
+        # checkout six times; reverting a single one to a tag slipped through.
+        one_reverted = FIXTURE_CI.replace(
+            f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", "actions/checkout@v7.0.1", 1
+        )
+        # The other pin is still correct -- that is the whole point of the case.
+        self.assertIn(f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", one_reverted)
+        with fixture_repo(**{".github/workflows/ci.yaml": one_reverted}):
+            problems = bump_deps.check_invariants()
+        self.assertTrue(any("commit SHA" in p for p in problems), problems)
+
+    def test_the_second_workflow_is_checked_too(self):
+        # deps.yaml pins actions/checkout as well, and was invisible to bump-deps
+        # before ACTION pins carried a list of files -- so `--apply` would rewrite
+        # ci.yaml, leave this file behind, and then report everything current.
+        stale = DEPS_YAML.replace(f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", "actions/checkout@v7")
+        with fixture_repo(**{".github/workflows/deps.yaml": stale}):
+            problems = bump_deps.check_invariants()
+        self.assertTrue(
+            any("deps.yaml" in p and "commit SHA" in p for p in problems), problems
+        )
+
+
+class ReplaceActionPin(unittest.TestCase):
+    """Rewriting an ACTION pin: both halves, every file, nothing else."""
+
+    def test_rewrites_commit_and_comment_together(self):
+        with fixture_repo() as repo:
+            n = bump_deps.replace_action_pin(pin("actions/checkout"), "e" * 40, "v8.0.0")
+            self.assertEqual(n, 3)  # two in ci.yaml, one in deps.yaml
+            for rel in (".github/workflows/ci.yaml", ".github/workflows/deps.yaml"):
+                text = read(repo, rel)
+                self.assertIn(f"actions/checkout@{'e' * 40} # v8.0.0", text)
+                # A commit whose comment still claims the old release is the
+                # specific state this class exists to make impossible.
+                self.assertNotIn(CHECKOUT_SHA, text)
+                self.assertNotIn("v7.0.1", text)
+
+    def test_spans_every_file_in_the_pin(self):
+        # The regression guard for deps.yaml having been invisible: rewriting only
+        # the first file must not be mistaken for success.
+        with fixture_repo() as repo:
+            bump_deps.replace_action_pin(pin("actions/checkout"), "e" * 40, "v8.0.0")
+            self.assertIn("e" * 40, read(repo, ".github/workflows/deps.yaml"))
+
+    def test_leaves_other_actions_alone(self):
+        with fixture_repo() as repo:
+            bump_deps.replace_action_pin(pin("actions/checkout"), "e" * 40, "v8.0.0")
+            text = read(repo, ".github/workflows/ci.yaml")
+        self.assertIn(f"gitleaks/gitleaks-action@{GITLEAKS_SHA} # v3.0.0", text)
+
+    def test_line_count_never_changes(self):
+        with fixture_repo() as repo:
+            before = read(repo, ".github/workflows/ci.yaml").count("\n")
+            bump_deps.replace_action_pin(pin("actions/checkout"), "e" * 40, "v8.0.0")
+            after = read(repo, ".github/workflows/ci.yaml").count("\n")
+        self.assertEqual(before, after)
+
+    def test_nothing_to_replace_is_a_problem(self):
+        empty = {".github/workflows/ci.yaml": "name: CI\n", ".github/workflows/deps.yaml": "name: d\n"}
+        with fixture_repo(**empty):
+            with self.assertRaises(Problem):
+                bump_deps.replace_action_pin(pin("actions/checkout"), "e" * 40, "v8.0.0")
+
+    def test_reads_back_what_it_wrote(self):
+        # replace_action_pin must leave text the pattern still matches; otherwise
+        # the next --check reports "pattern not found" instead of a clean tree.
+        with fixture_repo():
+            bump_deps.replace_action_pin(pin("actions/checkout"), "e" * 40, "v8.0.0")
+            self.assertEqual(
+                bump_deps.current_action_pin(pin("actions/checkout")), ("e" * 40, "v8.0.0")
+            )
 
 
 class Report(unittest.TestCase):
@@ -337,14 +444,18 @@ class Report(unittest.TestCase):
         for name, fn in self._saved.items():
             setattr(bump_deps, name, fn)
 
-    def _stub_github(self, latest=None, head=None, tag=None, ahead=0):
+    def _stub_github(self, latest=None, head=None, tag=None, ahead=0, commits=None):
         """Default to "upstream is exactly what the fixture pins", so a test only
         has to describe the one thing it wants to be different."""
         latest = latest or {}
+        commits = commits or {}
         bump_deps.latest_release = lambda repo: latest.get(repo, current_tag(repo))
         bump_deps.head_sha = lambda repo: head or FIXTURE_HEADS[repo]
         bump_deps.nearest_tag = lambda repo: tag if tag is not None else "0.14.0"
         bump_deps.ahead_by = lambda repo, sha: ahead
+        # ACTION pins resolve a tag to its commit. Default to the SHA the fixture
+        # already pins, so "upstream has not moved" needs no per-test setup.
+        bump_deps.tag_commit = lambda repo, t: commits.get(repo, FIXTURE_ACTION_SHAS[repo])
 
     def test_everything_current_is_reported_as_current(self):
         self._stub_github()
@@ -370,6 +481,49 @@ class Report(unittest.TestCase):
             rows = bump_deps.gather({"lazygit"})
         self.assertEqual(rows[0].latest, "0.58.0")
         self.assertEqual(rows[0].status, "current")
+
+    def test_an_action_whose_release_moved_is_flagged(self):
+        # Upstream cut v8.0.0, so both the commit and the comment are behind.
+        self._stub_github(
+            latest={"actions/checkout": "v8.0.0"},
+            commits={"actions/checkout": "c" * 40},
+        )
+        with fixture_repo():
+            rows = bump_deps.gather({"actions/checkout"})
+        self.assertEqual(rows[0].klass, "ACTION")
+        self.assertEqual(rows[0].status, "stale")
+        self.assertEqual(rows[0].latest, ("c" * 40)[:12])
+        self.assertIn("v7.0.1 -> v8.0.0", rows[0].detail)
+
+    def test_an_action_whose_comment_alone_is_wrong_is_flagged(self):
+        # The commit is current but the comment claims a different release. zizmor's
+        # ref-version-mismatch catches this in CI; bump-deps must not call it
+        # "current" and paper over it, because the comment is what humans read.
+        # Mislabeled in *both* files, so this is a wrong comment rather than the
+        # cross-file drift the next test covers.
+        old, new = f"actions/checkout@{CHECKOUT_SHA} # v7.0.1", f"actions/checkout@{CHECKOUT_SHA} # v5.0.0"
+        self._stub_github()
+        with fixture_repo(
+            **{
+                ".github/workflows/ci.yaml": FIXTURE_CI.replace(old, new),
+                ".github/workflows/deps.yaml": DEPS_YAML.replace(old, new),
+            }
+        ):
+            rows = bump_deps.gather({"actions/checkout"})
+        self.assertEqual(rows[0].status, "stale")
+        # The commit did not move, so only the comment needs correcting.
+        self.assertEqual(rows[0].current, rows[0].latest)
+        self.assertIn("v5.0.0 -> v7.0.1", rows[0].detail)
+
+    def test_an_action_pinned_differently_in_each_workflow_aborts(self):
+        # The failure mode ACTION pins exist to prevent: one file bumped, the other
+        # forgotten. Picking a winner and rewriting the rest would hide it.
+        drifted = DEPS_YAML.replace(CHECKOUT_SHA, "d" * 40)
+        self._stub_github()
+        with fixture_repo(**{".github/workflows/deps.yaml": drifted}):
+            with self.assertRaises(Problem) as ctx:
+                bump_deps.gather({"actions/checkout"})
+        self.assertIn("inconsistent pins", str(ctx.exception))
 
     def test_an_external_behind_head_is_flagged(self):
         self._stub_github(head="9" * 40, ahead=7)
@@ -428,31 +582,44 @@ class Registry(unittest.TestCase):
 
     def test_every_pattern_has_exactly_one_capture_group(self):
         # replace_value() rebuilds the match around m.group(1); a pattern with a
-        # different number of groups would silently edit the wrong text.
+        # different number of groups would silently edit the wrong text. ACTION
+        # pins are excluded because they carry two groups by design and are
+        # rewritten by replace_action_pin() instead -- see the next test.
         import re
 
-        for group in (bump_deps.VERSION_PINS, bump_deps.CONTENT_PINS, bump_deps.ANCHOR_PINS):
+        for group in SINGLE_GROUP_REGISTRIES:
             for entry in group:
                 compiled = re.compile(entry["pattern"])
                 self.assertEqual(
                     compiled.groups, 1, f"{entry['name']}: {entry['pattern']}"
                 )
 
+    def test_every_action_pattern_has_exactly_two_capture_groups(self):
+        # replace_action_pin() reads group(1) as the commit and group(2) as the
+        # version comment. A pattern with any other shape would rewrite the wrong
+        # half, or silently leave the comment pointing at the old release.
+        import re
+
+        for entry in bump_deps.ACTION_PINS:
+            compiled = re.compile(entry["pattern"])
+            self.assertEqual(compiled.groups, 2, f"{entry['name']}: {entry['pattern']}")
+
     def test_pin_names_are_unique(self):
-        names = [
-            e["name"]
-            for g in (bump_deps.VERSION_PINS, bump_deps.CONTENT_PINS, bump_deps.ANCHOR_PINS)
-            for e in g
-        ]
+        names = [e["name"] for g in ALL_REGISTRIES for e in g]
         self.assertEqual(len(names), len(set(names)), names)
 
     def test_every_registered_pin_resolves_against_the_real_repo(self):
         # No fixture here on purpose: this is the test that notices when someone
         # renames a variable in install.sh or ci.yaml and forgets the registry.
-        for group in (bump_deps.VERSION_PINS, bump_deps.CONTENT_PINS, bump_deps.ANCHOR_PINS):
+        for group in SINGLE_GROUP_REGISTRIES:
             for entry in group:
                 with self.subTest(pin=entry["name"]):
                     self.assertTrue(bump_deps.current_value(entry))
+        for entry in bump_deps.ACTION_PINS:
+            with self.subTest(pin=entry["name"]):
+                sha, version = bump_deps.current_action_pin(entry)
+                self.assertRegex(sha, r"^[0-9a-f]{40}$")
+                self.assertRegex(version, r"^v?\d+\.\d+\.\d+$")
 
     def test_the_real_repo_satisfies_its_own_invariants(self):
         self.assertEqual(bump_deps.check_invariants(), [])
@@ -460,6 +627,7 @@ class Registry(unittest.TestCase):
 
 # Convenience aliases so tests can build variants of a fixture.
 from helper import CI_YAML as FIXTURE_CI  # noqa: E402
+from helper import DEPS_YAML  # noqa: E402
 from helper import EXTERNALS_YAML as FIXTURE_EXTERNALS  # noqa: E402
 from helper import INSTALL_SH as FIXTURE_INSTALL  # noqa: E402
 
@@ -485,6 +653,9 @@ def current_tag(repo: str) -> str:
         "gitleaks/gitleaks-action": "v3.0.0",
         "jesseduffield/lazygit": "v0.58.0",
         "bats-core/bats-core": "v1.14.0",
+        "zizmorcore/zizmor": "v1.28.0",
+        "rhysd/actionlint": "v1.7.12",
+        "astral-sh/ruff": "0.16.0",
     }[repo]
 
 
