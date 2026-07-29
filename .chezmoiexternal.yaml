@@ -44,14 +44,14 @@
     stripComponents: 1
     checksum:
         sha256: "20665e469e720e674964a66854d5534b9af78cdfd438512746ecd1ade8e819ce"
-# zsh-users/zsh-completions @ 2026-07-27 (nearest tag: 0.36.0)
+# zsh-users/zsh-completions @ 2026-07-29 (nearest tag: 0.36.0)
 ".local/zsh-plugins/zsh-completions":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-completions/archive/bf2c5393295fe82d74e3b4585baa483722653ab8.tar.gz"
+    url: "https://github.com/zsh-users/zsh-completions/archive/6ea4709fbc64f813ffa013fdd062fa0f0d9a0dab.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "b3c78c5925342b46c530ad825d4fe22b27d6872d0f8a82138d474510563afbd6"
+        sha256: "1eca73bd68787d53bfb6c3a89df89e9bc627cdfc29bc6ab15d189517f6c0b5c2"
 # zsh-users/zsh-history-substring-search @ 2026-01-15 (nearest tag: v1.1.0)
 ".local/zsh-plugins/zsh-history-substring-search":
     type: "archive"
