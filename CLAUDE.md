@@ -117,7 +117,7 @@ So the trailing comment is not decoration — it is checked, which is why `bump-
 
 Completion caches live under `$XDG_CACHE_HOME/zsh/` (`zcompdump`, `zcompcache/`), not in `$HOME`. `compinit` is invoked with an explicit `-d` for that reason; if you change the path, change it in both `dot_zshrc` and `zsh/completion.zsh`.
 
-`TERM` is deliberately **not** set anywhere. Ghostty, tmux (`dot_tmux.conf` sets `tmux-256color`) and herdr each set it correctly; a blanket `export TERM=xterm-256color` used to overwrite all three. If an ssh target lacks a terminfo entry, fix it there (`infocmp -x | ssh host -- tic -x -`) or set `term =` in `dot_config/ghostty/config`.
+`TERM` is deliberately **not** set anywhere. Ghostty, tmux (`dot_tmux.conf` sets `tmux-256color`) and herdr each set it correctly; a blanket `export TERM=xterm-256color` used to overwrite all three. If an ssh target lacks a terminfo entry, fix it there (`infocmp -x | ssh host -- tic -x -`) or set `term =` in `dot_config/ghostty/config.tmpl`.
 
 Startup performance: `dot_zshrc` defines a `cached-eval` helper that caches the output of `eval "$(cmd init ...)"` style hooks in `~/.cache/zsh/` and re-runs the command only when the tool's binary is newer than the cache (used by `atuin/atuin.zsh` and `homebrew/homebrew.zsh`). Prefer `cached-eval <cache-name> <cmd> <args...>` over `eval "$(...)"` for new integrations, zsh builtin parameters (`$OSTYPE`, `$HOST`, `$TTY`, `$commands[...]`) over `$(uname)`/`$(tty)`/`$(which ...)` forks, and chezmoi apply-time scripts over per-shell setup work.
 
@@ -140,6 +140,7 @@ Custom executables that run in-place from the chezmoi source directory. `system/
 - `bump-deps` — reports and bumps every pinned dependency across the four files that hold them; the only Python script in `bin/`. See "Bumping pinned dependencies" above.
 - `git-*` — custom git subcommands: `backup-branch`, `checkout-default-branch`, `clean-submodules`, `copy-branch-name`, `delete-local-merged`, `nuke`, `promote`, `track`, `unpushed`, `unpushed-stat`, `up`
 - `secret` — Keychain CRUD wrapper around macOS `security` (`set`/`get`/`rotate`/`rm` generic-password secrets; account defaults to `$USER`, override with `$SECRET_ACCOUNT`). Also provides the **env bundle** (`env` / `env-edit` / `env-import`) — see below.
+- `ghostty-session` — what Ghostty runs as its `initial-command`; launches or attaches herdr, then falls through to a login shell. See "Ghostty starts herdr" below
 - `herdr-reload-all` — re-execs the login shell (`reload`) in every herdr *shell* pane at once (agent panes skipped); for applying updated dotfiles across all tabs/workspaces. On a `herdr pane list` protocol mismatch (CLI newer than the running server, common after `brew upgrade herdr`) it prints how to restart the server rather than leaking raw JSON; it never restarts the server itself (that would kill every pane process, agents included)
 - `enum`, `makeEnv` — misc utilities (Linux/Kali oriented)
 - `start-bloodhound`, `tun0.sh`, `pycharm` — security/tool launchers
@@ -176,7 +177,7 @@ Some files here are reference material that a human imports by hand. Nothing in 
 
 Both are live. `MATE.terminal` was previously *also* loaded automatically by the Parrot bootstrap script; retiring Parrot removed that one automated caller but not the file's purpose.
 
-Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`. `dot_config/herdr/config.toml` (managed by chezmoi) is herdr's config, applied to `~/.config/herdr/config.toml`.
+Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config, applied to `~/.config/zed/settings.json`; the Zed CLI symlink is handled by `.chezmoiscripts/darwin/run_after_20_zed_symlink.sh.tmpl`. `dot_config/ghostty/config.tmpl` (managed by chezmoi) is Ghostty's terminal config, applied to `~/.config/ghostty/config`. `dot_config/herdr/config.toml` (managed by chezmoi) is herdr's config, applied to `~/.config/herdr/config.toml`.
 
 ### Secrets and shell startup: the `secret` env bundle
 
@@ -243,6 +244,23 @@ long-running agent happens to be holding.
 ### tmux / herdr alignment
 `dot_tmux.conf` and `dot_config/herdr/config.toml` are intentionally kept aligned (same Ctrl-a prefix, `|`/`-` split keys, vi copy mode, session-persistence behavior). When changing a setting in one, mirror the equivalent setting in the other — the tmux↔herdr mapping lives as comments in `dot_config/herdr/config.toml`.
 
+### Ghostty starts herdr
+
+`dot_config/ghostty/config.tmpl` sets `initial-command` to `bin/ghostty-session`, so opening Ghostty lands you in herdr. **The launch-or-attach decision is herdr's, not ours** — bare `herdr` starts the headless server if it is not running and attaches to the existing session if it is. Nothing here inspects `herdr status`; don't add a check that duplicates it.
+
+The wrapper exists for the three things herdr cannot do when the *GUI* starts it:
+
+- **It finds the binary.** A GUI launch inherits none of the `PATH` that `homebrew/homebrew.zsh` and `system/path.zsh` build — `PATH=/usr/bin:/bin sh -c 'command -v herdr'` fails, so `initial-command = herdr` would not resolve. `find_herdr` falls back to a prefix loop, the same problem and fix as in `run_onchange_before_10_homebrew.sh.tmpl`. `herdr_candidates` is a *function* so tests can redirect it; a constant would make the "herdr is not installed" test attach to a live session on a developer machine.
+- **It cannot lock you out.** Ghostty closes the window when its command exits, so every exit path here ends in `exec "${SHELL:-/bin/zsh}" -l`: herdr missing, herdr failing to start, and herdr detaching (`ctrl-a q`) all leave a usable prompt with the output still on screen. herdr runs as a child, not `exec`, for exactly that reason.
+- **It does not nest.** herdr exports `HERDR_ENV` in every pane and its `allow_nested` defaults to false. `HERDR_AUTOSTART=0` is the manual escape hatch.
+
+Two consequences worth knowing:
+
+- `initial-command`, not `command`, so new windows and `Cmd-T` tabs stay plain shells. Ghostty's docs are explicit that it applies only to the first surface ever created — **close that window and the next one is a plain shell until Ghostty restarts.** That is the accepted cost of the setting.
+- **Do not set `shell-integration = zsh` to give the fallback shell Ghostty's cursor/title features.** Because `initial-command`'s basename is not a known shell, `detect` skips injection today. Forcing `zsh` injects `ZDOTDIR`, and since no shell runs before herdr to restore it, that `ZDOTDIR` leaks into the herdr **server** and therefore into every pane's shell — changing every pane to fix cosmetics on a rescue path.
+
+Note that `tests/bats/ghostty_session.bats` unsets `HERDR_ENV`/`HERDR_AUTOSTART` in `setup`. The suite is usually run from inside a herdr pane, which exports the first one; without that, every test takes the nesting guard and passes for the wrong reason.
+
 ### `dot_gitignore` vs `.gitignore`
 Two gitignore files coexist in this repo. `dot_gitignore` is managed by chezmoi and becomes `~/.gitignore` (the global gitignore). `.gitignore` is the repo's own gitignore and only excludes `system/linux.zsh`. When editing the global gitignore, use `dot_gitignore`.
 
@@ -263,12 +281,14 @@ parts worth knowing before you touch anything:
   and have no tests; testing them would only restate them. Effort goes where a
   bug is invisible or dangerous: `bin/secret`'s `shell_quote` (its output is
   `eval`'d by every interactive shell), `bin/herdr-reload-all`'s agent-pane
-  exclusion, the template traps documented above, and the cross-file invariants
-  no linter can see.
+  exclusion, `bin/ghostty-session`'s guarantee that every path ends at a login
+  shell (it is Ghostty's `initial-command`, so a bug there is a terminal that
+  will not open), the template traps documented above, and the cross-file
+  invariants no linter can see.
 - **`security` and `herdr` are stubbed; `jq` is not.** The first two are
   macOS-only or have real side effects. `herdr-reload-all`'s behavior largely
   *is* its jq filters, so stubbing jq would test nothing.
-- **`bin/secret` and `bin/herdr-reload-all` end in a sourced-guard** so tests can
+- **`bin/secret`, `bin/herdr-reload-all` and `bin/ghostty-session` end in a sourced-guard** so tests can
   reach individual functions. Use `if/then`, not `[ ... ] && main "$@"` — the
   latter leaves a non-zero status when sourced and `set -e` kills the caller.
   `herdr-reload-all`'s dependency checks live *inside* `main()` for the same

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+#
+# ghostty-session - land in herdr when Ghostty opens, and never in nothing.
+#
+# Ghostty runs this as its `initial-command` (dot_config/ghostty/config.tmpl).
+# The launch-or-attach decision itself is herdr's: bare `herdr` starts the
+# headless server if it is not running and attaches to the existing session if
+# it is, so there is nothing here that inspects `herdr status`.
+#
+# What this wrapper adds is the three things herdr cannot do for itself when it
+# is started by the GUI rather than from a shell:
+#
+#   1. Find the binary. A GUI launch does not inherit what homebrew/homebrew.zsh
+#      or system/path.zsh set, so `herdr` is not reliably on PATH -- see the
+#      prefix loop below, which is the same problem (and fix) as the one in
+#      .chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl.
+#   2. Not lock you out. Ghostty closes the window when the command it started
+#      exits, so a machine without herdr would get a window that flashes and
+#      vanishes. Every exit path here ends in a login shell instead.
+#   3. Not nest. herdr sets HERDR_ENV in every pane, and its `allow_nested` is
+#      false by default; the guard keeps this correct if the launch point ever
+#      moves from Ghostty's config into the shell.
+#
+# Usage: ghostty-session          (set HERDR_AUTOSTART=0 to skip straight to a shell)
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# Where herdr lives when nothing has put it on PATH. A function rather than a
+# constant so tests can point it somewhere harmless -- otherwise the "herdr is
+# not installed" test would find the real herdr and attach to a live session.
+herdr_candidates() {
+    printf '%s\n' \
+        /opt/homebrew/bin/herdr \
+        /usr/local/bin/herdr \
+        "$HOME/.local/bin/herdr"
+}
+
+# Print the herdr binary's path, or fail if there is none.
+find_herdr() {
+    local found candidate
+    if found="$(command -v herdr 2>/dev/null)"; then
+        printf '%s\n' "$found"
+        return 0
+    fi
+    while IFS= read -r candidate; do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done < <(herdr_candidates)
+    return 1
+}
+
+# The one way out of this script. $SHELL is what Ghostty would have run on its
+# own; the /bin/zsh fallback covers an empty environment.
+exec_login_shell() {
+    exec "${SHELL:-/bin/zsh}" -l
+}
+
+main() {
+    if [ "${HERDR_AUTOSTART-}" = "0" ] || [ -n "${HERDR_ENV-}" ]; then
+        exec_login_shell
+    fi
+
+    local herdr
+    if ! herdr="$(find_herdr)"; then
+        # Said out loud: silence here is indistinguishable from the feature
+        # simply not working, and the window looks like an ordinary shell.
+        echo "ghostty-session: herdr not found; starting a plain login shell" >&2
+        exec_login_shell
+    fi
+
+    # A child, not exec: when herdr exits -- detached with the prefix key, or
+    # crashed -- the window stays open at a prompt with its output still on
+    # screen, rather than closing out from under you.
+    local rc=0
+    "$herdr" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "ghostty-session: herdr exited with status $rc" >&2
+    fi
+
+    exec_login_shell
+}
+
+# Only dispatch when executed, so tests/bats/ghostty_session.bats can source this
+# file to reach find_herdr() and to override herdr_candidates() before calling
+# main(). if/then rather than `[ ... ] && main "$@"`: that form leaves a non-zero
+# status as the last command when sourced, and `set -e` above would then kill the
+# sourcing shell.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
