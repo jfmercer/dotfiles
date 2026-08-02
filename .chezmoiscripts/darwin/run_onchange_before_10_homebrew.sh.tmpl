@@ -61,6 +61,7 @@ export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
        brew info --cask --json=v2 <token> | jq -r '.casks[].sha256'
      Anything that gains a real checksum upstream should move to $casks. */}}
 {{ $casks_no_sha := list
+     "claude-code@latest"
      "font-gentium-plus"
      "font-menlo-for-powerline" }}
 
