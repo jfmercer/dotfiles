@@ -99,8 +99,8 @@ from globs, so most of it covers new files automatically.
 
 For a new suite, `load helpers/stub.bash` gets you `setup_sandbox`, `make_stub`,
 `only_stubs`, and the `assert_*` helpers. Scripts that run `main "$@"` need the
-sourced-guard that `bin/secret` and `bin/herdr-reload-all` have before individual
-functions can be called directly:
+sourced-guard that `bin/secret`, `bin/herdr-reload-all` and `bin/ghostty-session`
+have before individual functions can be called directly:
 
 ```bash
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
@@ -120,6 +120,9 @@ put it back:
 |-------|-------------|
 | `bin/secret`: change `shell_quote`'s sed to `s/'/\\'/g` | 3 secret tests |
 | `bin/herdr-reload-all`: `select(.agent == null)` → `select(.)` | agent-pane test |
+| `bin/ghostty-session`: `"$herdr" \|\| rc=$?` → `"$herdr"` | the non-zero-exit test |
+| `bin/ghostty-session`: drop the final `exec_login_shell` | 4 ghostty-session tests |
+| rename `bin/ghostty-session` without editing the Ghostty config | 2 `invariants.bats` tests |
 | `.chezmoiversion` → `2.99.0` | `test_floor_above_...`, and an invariants test |
 | remove `bin/` from `.chezmoiignore` | `invariants.bats` |
 | edit `HOMEBREW_CASK_OPTS` in `homebrew/exports.zsh` only | `templates.bats` |

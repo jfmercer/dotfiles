@@ -1,0 +1,20 @@
+font-family = "Menlo Regular for Powerline"
+font-size   = 22
+theme       = "Molokai"
+bell-features = no-title,no-attention,no-system,no-audio,no-border
+
+# Land in herdr on launch. Bare `herdr` already starts the server if it is not
+# running and attaches to the existing session if it is; bin/ghostty-session
+# wraps it only to locate the binary (a GUI launch inherits none of the PATH an
+# interactive zsh sets up) and to fall through to a login shell when herdr exits
+# or is not installed, so a window can never open onto nothing.
+#
+# `initial-command`, not `command`: this applies only to the FIRST surface
+# created at app launch, so new windows and Cmd-T tabs stay plain shells. The
+# flip side, per Ghostty's own docs: once that first surface is closed there is
+# no way to trigger this again, so a window opened afterwards is a plain shell
+# until Ghostty is restarted.
+#
+# The chezmoi SOURCE directory, not $HOME: bin/ is listed in .chezmoiignore and
+# runs in place, so no copy of this script ever exists under $HOME.
+initial-command = {{ .chezmoi.sourceDir }}/bin/ghostty-session

@@ -187,6 +187,34 @@ load helpers/stub.bash
         || { echo "herdr config.toml no longer mentions vi copy mode" >&2; return 1; }
 }
 
+# ------------------------------------------------------- ghostty / herdr launch
+
+@test "Ghostty's initial-command points at a bin script that exists" {
+    # Ghostty does not validate this path. If bin/ghostty-session is renamed or
+    # removed, Ghostty silently falls back to a plain shell and never says why --
+    # the feature just stops working and looks like herdr's fault.
+    local cfg="$REPO_ROOT/dot_config/ghostty/config.tmpl"
+    local line
+    line="$(grep '^initial-command *=' "$cfg" || true)"
+    [ -n "$line" ] || { echo "no initial-command in $cfg" >&2; return 1; }
+
+    case "$line" in
+        *bin/ghostty-session) ;;
+        *) echo "initial-command no longer runs bin/ghostty-session: $line" >&2; return 1 ;;
+    esac
+    [ -x "$REPO_ROOT/bin/ghostty-session" ] \
+        || { echo "bin/ghostty-session is missing or not executable" >&2; return 1; }
+}
+
+@test "Ghostty's initial-command resolves through the chezmoi source directory" {
+    # It must be .chezmoi.sourceDir, not .chezmoi.homeDir: bin/ is in
+    # .chezmoiignore and runs in place, so no copy of the script ever exists
+    # under $HOME. A homeDir path renders fine and then never resolves.
+    run grep -qF '{{ .chezmoi.sourceDir }}/bin/ghostty-session' \
+        "$REPO_ROOT/dot_config/ghostty/config.tmpl"
+    assert_success
+}
+
 # ------------------------------------------------------------- shell hygiene
 
 @test "no topic file sets TERM unconditionally" {
