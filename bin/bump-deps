@@ -191,6 +191,14 @@ ANCHOR_PINS = [
         "kind": "gpg-fingerprint",
         "verify_at": "https://github.com/eza-community/eza",
     },
+    {
+        "name": "charm-key",
+        "file": LINUX,
+        "pattern": r'CHARM_KEY_FPR="([0-9A-F]{40})"',
+        "url": "https://repo.charm.sh/apt/gpg.key",
+        "kind": "gpg-fingerprint",
+        "verify_at": "https://github.com/charmbracelet/glow#installation",
+    },
 ]
 
 # ------------------------------------------------------------------ plumbing
@@ -517,6 +525,7 @@ def check_invariants() -> list[str]:
                     )
             if not seen:
                 problems.append(f"{rel}: {pin['name']} pin not found")
+
     return problems
 
 

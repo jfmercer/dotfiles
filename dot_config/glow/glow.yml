@@ -1,0 +1,29 @@
+# glow configuration — applied to ~/.config/glow/glow.yml by chezmoi.
+#
+# One file serves both platforms. glow searches $GLOW_CONFIG_HOME, then
+# $XDG_CONFIG_HOME/glow, then the OS config dir (main.go,
+# tryLoadConfigFromDefaultPlaces). dot_zshenv exports XDG_CONFIG_HOME, so this
+# path wins everywhere; without it macOS would read ~/Library/Preferences/glow
+# instead and need a second, Library-shaped copy of this file.
+#
+# Keys are glow v2's (style, mouse, pager, width). `local` was a v1 key and is
+# gone; `all` is omitted deliberately so viper's own default applies, since
+# glow's written-out default (false) contradicts its SetDefault (true).
+
+# style name or JSON path (default "auto")
+style: "auto"
+# mouse support (TUI-mode only)
+mouse: false
+# use pager to display markdown.
+#
+# The reason this file is tracked at all: `glow foo.md` pages without needing
+# --pager. glow reads this into the same variable the flag sets
+# (`pager = viper.GetBool("pager")`), so it is exactly equivalent to passing the
+# flag -- not a softer default.
+#
+# NB glow does NOT gate paging on stdout being a TTY, so this applies to piped
+# and redirected runs too. It is benign in practice: $PAGER (or glow's `less -r`
+# fallback) sees a non-TTY stdout and passes the text straight through.
+pager: true
+# word-wrap at width
+width: 80

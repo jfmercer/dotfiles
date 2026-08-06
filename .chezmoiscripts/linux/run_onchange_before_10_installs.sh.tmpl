@@ -123,6 +123,12 @@ fi
 # purpose, so it is deliberately in the clear -- gitleaks' generic-api-key rule
 # only flags it because the name contains "KEY" and the value is high-entropy.
 EZA_KEY_FPR="1548BC8A4B4D2688F9B0DAF7EC29E2090CE3FD43" # gitleaks:allow
+# Charm's apt signing key, for glow. Same "public key, deliberately in the
+# clear" reasoning as eza's above.
+# Heads-up: this key carries an expiry of 2027-07-13, which eza's does not. When
+# it lapses upstream will publish a new one and the check below will fail loudly
+# -- that is a rotation to verify by hand, not a bug to work around.
+CHARM_KEY_FPR="ED927B38BE981E53CA09153D03BBF595D4DFD35C" # gitleaks:allow
 RUSTUP_INIT_SHA256="6c30b75a75b28a96fd913a037c8581b580080b6ee9b8169a3c0feb1af7fe8caf"
 LAZYGIT_VERSION="0.63.1"
 
@@ -155,6 +161,43 @@ if [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
     sudo apt update
 fi
 sudo apt install -y eza
+
+# install glow: https://github.com/charmbracelet/glow#installation
+# glow is in no Debian or Ubuntu repo, so upstream's own apt repo is the only
+# apt route to it. Same shape as the eza block above, and hardened the same way:
+# upstream's published recipe pipes the key straight into `gpg --dearmor`
+# without ever looking at it, which trusts whatever repo.charm.sh returns.
+#
+# Two deliberate departures from that recipe:
+#   - the fingerprint check below, as with eza;
+#   - the sources file goes in /etc/apt/sources.list.d, not the /etc/sources.list.d
+#     the README says. That is an upstream typo -- apt does not read the latter,
+#     so following it verbatim registers nothing and `apt install glow` then
+#     fails with "Unable to locate package".
+# only set up the apt repo once; re-running is a no-op
+if [ ! -f /etc/apt/sources.list.d/charm.list ]; then
+    sudo mkdir -p /etc/apt/keyrings
+    # Bump: curl -fsSL https://repo.charm.sh/apt/gpg.key | gpg --show-keys --with-colons | awk -F: '/^fpr:/{print $10}'
+    keyfile=$(mktemp)
+    wget -qO- https://repo.charm.sh/apt/gpg.key > "$keyfile"
+    got_fpr=$(gpg --show-keys --with-colons "$keyfile" | awk -F: '/^fpr:/{print $10; exit}')
+    if [ "$got_fpr" != "$CHARM_KEY_FPR" ]; then
+        echo "charm signing key fingerprint mismatch!" >&2
+        echo "  expected: $CHARM_KEY_FPR" >&2
+        echo "  got:      $got_fpr" >&2
+        rm -f "$keyfile"
+        exit 1
+    fi
+    # Dearmor unprivileged and `tee` the privileged write, as with eza (SC2024).
+    gpg --dearmor < "$keyfile" | sudo tee /etc/apt/keyrings/charm.gpg > /dev/null
+    rm -f "$keyfile"
+    # `* *` is not a placeholder -- repo.charm.sh is a flat repository, so the
+    # suite and component fields are literal wildcards.
+    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+    sudo chmod 644 /etc/apt/keyrings/charm.gpg /etc/apt/sources.list.d/charm.list
+    sudo apt update
+fi
+sudo apt install -y glow
 
 ### RUST INSTALLS
 
