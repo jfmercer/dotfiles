@@ -18,6 +18,7 @@ from helper import (
     ALL_REGISTRIES,
     CHECKOUT_SHA,
     GITLEAKS_SHA,
+    LINUX_TMPL,
     SINGLE_GROUP_REGISTRIES,
     bump_deps,
     fixture_repo,
@@ -374,6 +375,32 @@ class CheckInvariants(unittest.TestCase):
         self.assertTrue(
             any("deps.yaml" in p and "commit SHA" in p for p in problems), problems
         )
+
+    def test_an_unregistered_key_fingerprint_is_caught(self):
+        # Exactly the failure above, one class over: the fingerprint in the install
+        # script blocks a bad key at install time, but only an ANCHOR_PINS entry
+        # makes deps.yaml fetch the live key weekly. Add the first without the
+        # second and the pin is never checked, while the report still lists every
+        # anchor it knows about as "current".
+        added = LINUX_TMPL.replace(
+            'EZA_KEY_FPR="' + "A" * 40 + '"',
+            'EZA_KEY_FPR="' + "A" * 40 + '"\nSOMEVENDOR_KEY_FPR="' + "D" * 40 + '"',
+        )
+        with fixture_repo(
+            **{".chezmoiscripts/linux/run_onchange_before_10_installs.sh.tmpl": added}
+        ):
+            problems = bump_deps.check_invariants()
+        self.assertTrue(
+            any("SOMEVENDOR_KEY_FPR" in p and "ANCHOR_PINS" in p for p in problems),
+            problems,
+        )
+
+    def test_a_registered_key_fingerprint_is_not_flagged(self):
+        # Guards against the check degenerating into "any fingerprint is a
+        # problem", which would fire on the clean tree and get deleted.
+        with fixture_repo():
+            problems = bump_deps.check_invariants()
+        self.assertEqual([p for p in problems if "ANCHOR_PINS" in p], [])
 
 
 class ReplaceActionPin(unittest.TestCase):

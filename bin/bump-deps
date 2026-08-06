@@ -526,6 +526,24 @@ def check_invariants() -> list[str]:
             if not seen:
                 problems.append(f"{rel}: {pin['name']} pin not found")
 
+    # 4. Every GPG fingerprint in the install script must be a registered ANCHOR.
+    #    The fingerprint in the script only stops a bad key at install time; it is
+    #    the ANCHOR_PINS entry that makes deps.yaml fetch the live key weekly and
+    #    report a rotation. Those are two files, and nothing else compares them --
+    #    so an unregistered pin is simply never checked, while the report still
+    #    lists every anchor it does know as "current". Same shape as the ACTION
+    #    bug above, where only ci.yaml was registered and deps.yaml was certified
+    #    without ever being read.
+    text = read(LINUX)
+    registered = {p["pattern"].split('="', 1)[0] for p in ANCHOR_PINS}
+    for m in re.finditer(r"^([A-Z][A-Z0-9_]*_KEY_FPR)=", text, re.M):
+        name = m.group(1)
+        if name not in registered:
+            problems.append(
+                f"{LINUX}: {name} is not registered in bump-deps' ANCHOR_PINS, so "
+                "no weekly check ever fetches that key -- a rotation (or a "
+                "substituted key) would surface only when a fresh install fails"
+            )
     return problems
 
 
