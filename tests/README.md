@@ -131,5 +131,6 @@ put it back:
 | revert any `actions/checkout` pin in `ci.yaml` to `@v7.0.1` | `test_the_real_repo_satisfies_its_own_invariants` |
 | change the `# v7.0.1` comment beside a checkout SHA to `# v6.0.0` | `bump-deps --check`, and zizmor's `ref-version-mismatch` in CI |
 | drop `deps.yaml` from `ACTION_PINS`'s `files` | `test_the_second_workflow_is_checked_too` |
+| add a `*_KEY_FPR` to the linux installs script without registering it in `ANCHOR_PINS` | `test_an_unregistered_key_fingerprint_is_caught`, and `bump-deps --check` |
 | `replace_action_pin`: stop rewriting `m.group(2)` | `bump-deps --self-test`, and 2 `ReplaceActionPin` tests |
 | correct `tests/fixtures/zizmor/canary.yml`'s version comment | the `workflows` job's canary step (CI only) |

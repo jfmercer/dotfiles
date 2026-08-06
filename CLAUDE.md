@@ -88,6 +88,8 @@ bump-deps --self-test  # prove the in-place editing is surgical
 
 It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and Actions **not** pinned to a commit SHA with a matching version comment.
 
+It also requires that **every `*_KEY_FPR` in the linux installs script is registered in `ANCHOR_PINS`**. The fingerprint in the script only blocks a bad key at install time; it is the `ANCHOR_PINS` entry that makes `deps.yaml` fetch the live key weekly and report a rotation. Those live in two files, so before this check an unregistered pin was simply never watched — while the report went on listing every anchor it *did* know as `current`. Precisely the `deps.yaml` failure below, one pin class over: a staleness detector certifying something it had never read.
+
 `.github/workflows/deps.yaml` runs `--check` weekly and keeps a single tracking issue in sync. It never commits — bumping stays deliberate.
 
 #### Why Actions are hash-pinned, and why the comment is load-bearing
