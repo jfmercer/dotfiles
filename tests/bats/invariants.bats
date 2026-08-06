@@ -215,6 +215,48 @@ load helpers/stub.bash
     assert_success
 }
 
+# --------------------------------------------- ghostty theme / Terminal.app
+
+@test "Ghostty's theme has a matching Terminal.app profile in terminal/" {
+    # terminal/Molokai.terminal exists so Terminal.app can reproduce the palette
+    # Ghostty is configured with. Change `theme` in the Ghostty config and that
+    # profile quietly stops corresponding to anything, while CLAUDE.md goes on
+    # claiming the two match.
+    #
+    # Deliberately an EXISTENCE check and never an exclusivity one: terminal/ is
+    # never enumerated, so profiles for themes no longer in use are invisible
+    # here and cannot be flagged as dead. Those files are hand-applied reference
+    # material -- see CLAUDE.md, "do not judge these by 'is anything
+    # referencing it?'". The fix for a red test here is to ADD a profile, never
+    # to delete or rename an existing one.
+    local cfg="$REPO_ROOT/dot_config/ghostty/config.tmpl"
+    local line theme
+    line="$(grep -m1 '^theme[[:space:]]*=' "$cfg" || true)"
+    [ -n "$line" ] || { echo "no theme set in $cfg" >&2; return 1; }
+    theme="${line#*=}"
+    # Strip quotes and surrounding blanks; internal spaces survive, since some
+    # Ghostty theme names have them ("Tokyo Night").
+    theme="$(printf '%s\n' "$theme" | tr -d '"' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$theme" ] || { echo "could not parse the theme name from: $line" >&2; return 1; }
+
+    local profile="$REPO_ROOT/terminal/$theme.terminal"
+    [ -f "$profile" ] || {
+        echo "ghostty theme is '$theme' but terminal/$theme.terminal is missing." >&2
+        echo "ADD that profile; do not delete or rename the other profiles in terminal/." >&2
+        return 1
+    }
+
+    # plistlib reads XML and binary plists alike, and tests/run already invokes
+    # python3 unconditionally, so this needs no skip guard.
+    local name
+    name="$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb")).get("name",""))' "$profile")"
+    [ "$name" = "$theme" ] || {
+        echo "terminal/$theme.terminal declares name '$name', not '$theme'." >&2
+        echo "Terminal.app lists profiles by that key, not by filename, so it would import under the wrong name." >&2
+        return 1
+    }
+}
+
 # ------------------------------------------------------------- shell hygiene
 
 @test "no topic file sets TERM unconditionally" {
