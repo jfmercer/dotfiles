@@ -123,6 +123,8 @@ put it back:
 | `bin/ghostty-session`: `"$herdr" \|\| rc=$?` → `"$herdr"` | the non-zero-exit test |
 | `bin/ghostty-session`: drop the final `exec_login_shell` | 4 ghostty-session tests |
 | rename `bin/ghostty-session` without editing the Ghostty config | 2 `invariants.bats` tests |
+| point the Ghostty config's `theme` at a name with no `terminal/<name>.terminal` | the Terminal.app profile invariant |
+| edit the `name` key inside `terminal/Molokai.terminal` | the same test, on the `name` mismatch branch |
 | `.chezmoiversion` → `2.99.0` | `test_floor_above_...`, and an invariants test |
 | remove `bin/` from `.chezmoiignore` | `invariants.bats` |
 | edit `HOMEBREW_CASK_OPTS` in `homebrew/exports.zsh` only | `templates.bats` |
