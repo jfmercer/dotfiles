@@ -11,6 +11,12 @@ export FZF_DEFAULT_COMMAND="git ls-files --cached --others --exclude-standard | 
 export FZF_CTRL_T_COMMAND="fd $FD_OPTIONS"
 export FZF_ALT_C_COMMAND="fd --type d $FD_OPTIONS"
 
+# Give Ctrl-R to atuin: `fzf --zsh` guards its history widget with
+# `if [[ ${FZF_CTRL_R_COMMAND-x} != "" ]]`, so set-but-empty skips the `zle -N`
+# and all three bindkeys. Belongs here, not in fzf.zsh -- exports.zsh is
+# sourced in an earlier pass, before fzf's init reads the guard.
+export FZF_CTRL_R_COMMAND=
+
 # On Linux, we need fdfind instead of fd and batcat instead of bat.
 if [[ "$OSTYPE" == linux* ]]; then
     # with file preview
