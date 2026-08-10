@@ -5,5 +5,6 @@
 # cached-eval (dot_zshrc) is a no-op when fzf isn't installed.
 cached-eval fzf-init fzf --zsh
 
-# atuin owns Ctrl-R (see atuin/atuin.zsh, loaded after this file), so fzf's
-# history widget is intentionally shadowed. Ctrl-T and Alt-C are fzf's.
+# Ctrl-T and Alt-C are fzf's; Ctrl-R is atuin's, suppressed here by
+# FZF_CTRL_R_COMMAND= in exports.zsh. Not by load order -- the `*/*.zsh` glob
+# in dot_zshrc is alphabetical, so atuin/ is sourced *before* fzf/.
