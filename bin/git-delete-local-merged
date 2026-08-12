@@ -1,8 +1,33 @@
 #!/bin/sh
 #
-# Delete all local branches that have been merged into HEAD. Stolen from
-# our favorite @tekkub:
+# Delete every local branch already merged into HEAD, skipping the branch you
+# are on and the default branch (`master` or `main`, as in
+# git-checkout-default-branch).
 #
-#   https://plus.google.com/115587336092124934674/posts/dXsagsvLakJ
+# Descended from a one-liner by @tekkub that stripped the newlines out of
+# `git branch --merged` and handed the result to `git branch -d` as one
+# quoted argument, so with more than one candidate it could only ever say
+#
+#   error: branch '  topic-a  topic-b' not found
+#
+# It also matched `master` as a substring, which skipped branches like
+# `feature/master-fix` while protecting nothing named `main`.
 
-git branch -d "$(git branch --merged | grep -v '^\*' | grep -v 'master' | tr -d '\n')"
+set --
+
+current=$(git branch --show-current)
+
+# Ref names cannot contain whitespace, so splitting on it is safe here.
+for branch in $(git for-each-ref --format='%(refname:short)' --merged=HEAD refs/heads/); do
+    case "$branch" in
+        master | main | "$current") continue ;;
+    esac
+    set -- "$@" "$branch"
+done
+
+if [ "$#" -eq 0 ]; then
+    echo "No merged branches to delete."
+    exit 0
+fi
+
+git branch -d "$@"
