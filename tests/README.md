@@ -43,8 +43,21 @@ the code where a bug is either invisible or dangerous:
   --merged` into a single quoted argument (`error: branch '  topic-a  topic-b'
   not found`, deleting nothing), and it filtered with an unanchored `grep -v
   master`, which skipped `feature/master-fix` and protected nothing named `main`.
-  Both are one-line edits away from returning, and neither is visible in a diff
-  review; the suite runs the real git against a throwaway repo per test.
+
+  Fixing those revealed the deeper problem: this repo is **rebase-merge only**,
+  so a merged branch is replayed under new SHAs and no ancestry test can ever
+  see it. The script's second predicate — commits patch-identical upstream
+  **and** remote branch gone — is what makes it work here, and it deletes with
+  `git branch -D`, since git regards those branches as unmerged. Both signals
+  are required, and the suite pins that: dropping either one turns exactly one
+  test red (see the table below). Real git against a throwaway repo per test,
+  with a bare `origin` and a simulated rebase merge; nothing is stubbed.
+
+  One trap worth knowing if you extend it: replaying a commit onto an unchanged
+  master reproduces its hash exactly — same tree, parent, author and committer
+  second — so the branch stays an ancestor and the fixture silently tests the
+  wrong path. `rebase_merge` moves master on first, which is also what really
+  happens while a PR is open.
 - **`templates.bats`** — the traps CLAUDE.md documents, several of which have
   already bitten: a bare `#` in `.chezmoi.yaml.tmpl` swallowing the next key, and
   `dot_gitconfig.tmpl` needing `get . "work"` rather than `.work` (a machine
@@ -129,8 +142,10 @@ put it back:
 | `bin/secret`: change `shell_quote`'s sed to `s/'/\\'/g` | 3 secret tests |
 | `bin/herdr-reload-all`: `select(.agent == null)` → `select(.)` | agent-pane test |
 | `bin/ghostty-session`: `"$herdr" \|\| rc=$?` → `"$herdr"` | the non-zero-exit test |
-| `bin/git-delete-local-merged`: `master \| main \| "$current"` → `master*` | 3 git-delete-local-merged tests |
-| `bin/git-delete-local-merged`: `git branch -d "$@"` → `git branch -d "$*"` | the multiple-branch test |
+| `bin/git-delete-local-merged`: delete the `master \| main` guard | 4 git-delete-local-merged tests |
+| `bin/git-delete-local-merged`: `[ "$patched" -eq 1 ] && [ "$gone" -eq 1 ]` → `[ "$patched" -eq 1 ]` | the remote-still-exists test |
+| `bin/git-delete-local-merged`: the same, → `[ "$gone" -eq 1 ]` | the abandoned-branch test |
+| `bin/git-delete-local-merged`: `git branch -D` → `git branch -d` | the rebase-merged test |
 | `bin/ghostty-session`: drop the final `exec_login_shell` | 4 ghostty-session tests |
 | rename `bin/ghostty-session` without editing the Ghostty config | 2 `invariants.bats` tests |
 | point the Ghostty config's `theme` at a name with no `terminal/<name>.terminal` | the Terminal.app profile invariant |

@@ -1,33 +1,161 @@
 #!/bin/sh
 #
-# Delete every local branch already merged into HEAD, skipping the branch you
-# are on and the default branch (`master` or `main`, as in
-# git-checkout-default-branch).
+# Delete local branches whose work is already on the mainline.
 #
-# Descended from a one-liner by @tekkub that stripped the newlines out of
-# `git branch --merged` and handed the result to `git branch -d` as one
-# quoted argument, so with more than one candidate it could only ever say
+# Usage:
+#   git-delete-local-merged [-n|--dry-run] [branch...]
 #
-#   error: branch '  topic-a  topic-b' not found
+# With no branch names every local branch is considered. `master`, `main` and
+# the branch you are on are never deleted, named explicitly or not.
 #
-# It also matched `master` as a substring, which skipped branches like
-# `feature/master-fix` while protecting nothing named `main`.
+# A branch qualifies in one of two ways:
+#
+#   1. Its tip is an ancestor of HEAD -- what `git branch --merged` reports, and
+#      what a merge-commit workflow leaves behind. Deleted with `git branch -d`.
+#
+#   2. Every one of its commits is already upstream as a patch-identical commit
+#      (`git cherry`), AND its remote-tracking branch is gone. This repo is
+#      rebase-merge only -- GitHub has allow_squash_merge and allow_merge_commit
+#      off -- so merging replays a branch onto master under new SHAs and its tip
+#      is never an ancestor of anything. Case 1 alone can therefore never fire
+#      here, which is why this script sat broken for years without it being
+#      obvious that it was inert as well as buggy.
+#
+#      Both signals are required. Patch identity says the work landed; the gone
+#      remote branch says you are done with it. Either one alone is ambiguous:
+#      a branch you abandoned and deleted on the remote is gone without having
+#      landed, and a merged branch whose remote copy still exists may still be
+#      wanted. git regards these as unmerged, so they need `git branch -D` --
+#      run -n first to see what that would do.
 
-set --
+usage() {
+    echo "usage: git-delete-local-merged [-n|--dry-run] [branch...]"
+}
+
+dry_run=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -n | --dry-run) dry_run=1; shift ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            printf 'git-delete-local-merged: unknown option: %s\n' "$1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *) break ;;
+    esac
+done
+
+explicit=0
+if [ "$#" -gt 0 ]; then
+    explicit=1
+fi
 
 current=$(git branch --show-current)
 
-# Ref names cannot contain whitespace, so splitting on it is safe here.
-for branch in $(git for-each-ref --format='%(refname:short)' --merged=HEAD refs/heads/); do
-    case "$branch" in
-        master | main | "$current") continue ;;
+# The branches to consider, one per line. Ref names cannot contain whitespace,
+# so the caller can safely split this on it.
+candidates() {
+    if [ "$#" -gt 0 ]; then
+        printf '%s\n' "$@"
+    else
+        git for-each-ref --format='%(refname:short)' refs/heads/
+    fi
+}
+
+# classify <branch> -- sets $action (keep, delete_safe, delete_force) and
+# $reason, a phrase that reads after both "would keep: X (" and "X is ".
+classify() {
+    case "$1" in
+        "$current")
+            action=keep
+            reason="the branch you are on"
+            return
+            ;;
+        master | main)
+            action=keep
+            reason="the default branch"
+            return
+            ;;
     esac
-    set -- "$@" "$branch"
+
+    if git merge-base --is-ancestor "refs/heads/$1" HEAD; then
+        action=delete_safe
+        reason="already merged into HEAD"
+        return
+    fi
+
+    # git cherry prefixes a commit with + when it has no equivalent upstream.
+    if ! git cherry HEAD "refs/heads/$1" | grep -q '^+'; then
+        patched=1
+    else
+        patched=0
+    fi
+    if [ "$(git for-each-ref --format='%(upstream:track)' "refs/heads/$1")" = "[gone]" ]; then
+        gone=1
+    else
+        gone=0
+    fi
+
+    if [ "$patched" -eq 1 ] && [ "$gone" -eq 1 ]; then
+        action=delete_force
+        reason="merged upstream, remote branch gone"
+    elif [ "$patched" -eq 1 ]; then
+        action=keep
+        reason="merged upstream, but its remote branch still exists"
+    elif [ "$gone" -eq 1 ]; then
+        action=keep
+        reason="gone from the remote, but its commits are not upstream"
+    else
+        action=keep
+        reason="not merged"
+    fi
+}
+
+rc=0
+matched=0
+
+for branch in $(candidates "$@"); do
+    if ! git show-ref --quiet --verify "refs/heads/$branch"; then
+        printf 'git-delete-local-merged: %s: no such branch\n' "$branch" >&2
+        rc=1
+        continue
+    fi
+
+    classify "$branch"
+
+    case "$action" in
+        delete_safe | delete_force)
+            matched=$((matched + 1))
+            if [ "$dry_run" -eq 1 ]; then
+                printf 'would delete: %s (%s)\n' "$branch" "$reason"
+            elif [ "$action" = delete_force ]; then
+                git branch -D "$branch" || rc=1
+            else
+                git branch -d "$branch" || rc=1
+            fi
+            ;;
+        keep)
+            # Scanning every branch, saying why each one survived is noise.
+            # Naming a branch is a question, and deserves an answer.
+            if [ "$dry_run" -eq 1 ]; then
+                printf 'would keep:   %s (%s)\n' "$branch" "$reason"
+            elif [ "$explicit" -eq 1 ]; then
+                printf '%s is %s; leaving it.\n' "$branch" "$reason"
+            fi
+            ;;
+    esac
 done
 
-if [ "$#" -eq 0 ]; then
+if [ "$matched" -eq 0 ] && [ "$explicit" -eq 0 ] && [ "$dry_run" -eq 0 ]; then
     echo "No merged branches to delete."
-    exit 0
 fi
 
-git branch -d "$@"
+exit "$rc"
