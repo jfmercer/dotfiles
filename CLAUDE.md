@@ -292,8 +292,10 @@ parts worth knowing before you touch anything:
 - **`bats-core` is the shell runner**, `brew install bats-core` locally. CI
   installs a pinned, checksummed tarball and `bin/bump-deps` tracks the tag as a
   `VERSION` pin, so it cannot rot.
-- **Coverage is deliberately uneven.** The `git-*` helpers are 1–13 line wrappers
-  and have no tests; testing them would only restate them. Effort goes where a
+- **Coverage is deliberately uneven.** Most `git-*` helpers are 1–13 line wrappers
+  and have no tests; testing them would only restate them. The exception is
+  `bin/git-delete-local-merged`, which decides which branches to *destroy* and
+  had been silently broken for years. Effort otherwise goes where a
   bug is invisible or dangerous: `bin/secret`'s `shell_quote` (its output is
   `eval`'d by every interactive shell), `bin/herdr-reload-all`'s agent-pane
   exclusion, `bin/ghostty-session`'s guarantee that every path ends at a login
