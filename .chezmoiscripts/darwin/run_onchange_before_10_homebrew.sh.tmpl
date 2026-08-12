@@ -4,7 +4,7 @@
 set -eufo pipefail
 
 # `chezmoi apply` is not an interactive zsh, so it does not inherit the PATH set
-# by homebrew/homebrew.zsh. On Apple Silicon /opt/homebrew/bin is not on the
+# by homebrew/path.zsh. On Apple Silicon /opt/homebrew/bin is not on the
 # default PATH, so without this `brew bundle` below dies with "command not
 # found" and takes the whole apply with it.
 for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do

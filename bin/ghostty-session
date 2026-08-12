@@ -10,7 +10,7 @@
 # What this wrapper adds is the three things herdr cannot do for itself when it
 # is started by the GUI rather than from a shell:
 #
-#   1. Find the binary. A GUI launch does not inherit what homebrew/homebrew.zsh
+#   1. Find the binary. A GUI launch does not inherit what homebrew/path.zsh
 #      or system/path.zsh set, so `herdr` is not reliably on PATH -- see the
 #      prefix loop below, which is the same problem (and fix) as the one in
 #      .chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl.

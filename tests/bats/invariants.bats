@@ -71,6 +71,25 @@ load helpers/stub.bash
     assert_success
 }
 
+@test "brew shellenv runs from a path.zsh, not from the general pass" {
+    # /opt/homebrew/bin is in neither /etc/paths nor /etc/paths.d, so this is the
+    # only thing that puts Homebrew on PATH. dot_zshrc's general `*/*.zsh` pass is
+    # alphabetical, so as homebrew/homebrew.zsh it ran AFTER asdf/, atuin/, fzf/,
+    # git/ and gpg/ -- each of which then failed to find its own tool, silently,
+    # via cached-eval's `[[ -x $bin ]]` guard. That is how atuin's Ctrl-R and fzf's
+    # Ctrl-T/Alt-C went dead in herdr panes with no error anywhere.
+    local hits
+    hits="$(grep -rl 'brew shellenv' "$REPO_ROOT"/*/*.zsh 2>/dev/null || true)"
+    [ -n "$hits" ] || { echo "nothing invokes 'brew shellenv'; Homebrew will not be on PATH" >&2; return 1; }
+    local f
+    for f in $hits; do
+        case "$(basename "$f")" in
+            path.zsh) ;;
+            *) echo "$f invokes 'brew shellenv' outside the path.zsh pass" >&2; return 1 ;;
+        esac
+    done
+}
+
 # --------------------------------------------------------- zsh cache location
 
 @test "the zsh cache directory matches in dot_zshrc and zsh/completion.zsh" {
