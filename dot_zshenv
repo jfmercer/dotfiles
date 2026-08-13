@@ -22,6 +22,15 @@ export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export VISUAL="vim"
 export EDITOR="$VISUAL"
 
+# PAGER stays a bare command, with flags in LESS, because not every caller
+# word-splits $PAGER before exec'ing it -- `PAGER="less -R"` becomes a search
+# for a binary named "less -R" in those. LESS is read by less itself, so -R
+# (pass ANSI color through raw) now applies to every invocation: man, git's
+# delta pipeline, tools that exec less directly. It replaces an
+# `alias less="less -R"`, which only ever covered less typed at a prompt.
+export PAGER="less"
+export LESS="-R"
+
 # PATH is deliberately NOT set here. On macOS /etc/zprofile runs path_helper
 # AFTER this file and rebuilds PATH, demoting anything prepended here --
 # measured: asdf shims move from position 1 to position 13, behind
