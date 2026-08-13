@@ -13,7 +13,7 @@
 # style name or JSON path (default "auto")
 style: "auto"
 # mouse support (TUI-mode only)
-mouse: false
+mouse: true
 # use pager to display markdown.
 #
 # The reason this file is tracked at all: `glow foo.md` pages without needing
@@ -26,4 +26,4 @@ mouse: false
 # fallback) sees a non-TTY stdout and passes the text straight through.
 pager: true
 # word-wrap at width
-width: 80
+width: 100
