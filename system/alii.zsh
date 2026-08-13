@@ -75,9 +75,6 @@ alias cm=chezmoi
 # arsenal
 # alias a=arsenal
 
-# colorize less
-alias less="less -R"
-
 # Debian renames two binaries to avoid conflicts, and has no pasteboard.
 # These used to be appended to a gitignored system/linux.zsh by a
 # run_onchange_ script, which duplicated them on every script edit and lost
