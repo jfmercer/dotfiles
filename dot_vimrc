@@ -30,6 +30,11 @@ Plug 'tpope/vim-fugitive'
 Plug 'tpope/vim-surround'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
+" Filetype glyphs for nerdtree and airline above. MUST stay last in this list:
+" vim-devicons patches itself into the plugins it decorates, so it has to load
+" after them. It also needs a Nerd Font in the terminal -- see
+" dot_config/ghostty/config.tmpl -- and renders as boxes without one.
+Plug 'ryanoasis/vim-devicons'
 
 call plug#end()
 " ================ End vim-plug Setup ===============================
@@ -129,7 +134,7 @@ let g:rainbow_active = 1 "0 if you want to enable it later via :RainbowToggle
 
 " ================ gvim font =====================================
 
-set guifont=Menlo\ for\ Powerline:h18
+set guifont=MesloLGS\ Nerd\ Font:h18
 
 " ================ Solarized Colorscheme Settings =================
 
