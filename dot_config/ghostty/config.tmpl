@@ -1,4 +1,26 @@
-font-family = "Menlo Regular for Powerline"
+# MesloLGS is the Menlo derivative Nerd Fonts patches, so this is the closest
+# Nerd Font to the "Menlo Regular for Powerline" this used to name -- that font
+# carried only 7 private-use glyphs (U+E0A0-E0A2, U+E0B0-E0B3), just enough for
+# Powerline separators. Nothing else on this Mac covers the rest of the Nerd
+# Font ranges except .LastResort and a set of Arabic PUA fonts that claim the
+# same codepoints for their own presentation forms, so an icon glyph rendered as
+# a box or an unrelated ligature rather than simply going missing.
+#
+# The three axes in the cask's 18 variants:
+#   LGS/LGM/LGL -- line gap. S is the tightest and the closest to Menlo's own
+#                  line height (1.262 em vs Menlo's 1.164; M is 1.359, L 1.555).
+#   plain, not  -- the choice here is about icon OUTLINE size, not cell count:
+#   Mono/Propo     every glyph in both cuts advances the same 1233/2048 em. Mono
+#                  scales icon outlines down to fit that cell exactly; this plain
+#                  cut draws them at full size, so U+F015 spans 1.73 cells and
+#                  U+E702 1.31 and they bleed into the next column. Bigger,
+#                  better-looking icons, and the bleed is into a cell that is
+#                  almost always the space after a filename. Propo is the cut
+#                  that really is proportional -- 858 distinct advances -- and it
+#                  is the one that would break column alignment. Avoid it.
+#   no DZ       -- DZ is the dotted-zero cut; plain Meslo keeps Menlo's slashed
+#                  zero, so this stays a font swap and not a glyph change too.
+font-family = "MesloLGS Nerd Font"
 font-size   = 22
 theme       = "Molokai"
 bell-features = no-title,no-attention,no-system,no-audio,no-border

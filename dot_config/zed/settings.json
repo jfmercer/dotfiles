@@ -49,5 +49,15 @@
     "metrics": false
   },
   "ui_font_size": 18.0,
-  "buffer_font_size": 18.0
+  "buffer_font_size": 18.0,
+  // Match Ghostty (dot_config/ghostty/config.tmpl). Buffer and terminal only --
+  // ui_font_size is left on Zed's proportional default, since forcing a
+  // monospace face on the interface chrome helps nothing.
+  //
+  // Zed wants the FAMILY name here, not the PostScript name the Terminal.app
+  // profiles in terminal/ carry (MesloLGSNF-Regular).
+  "buffer_font_family": "MesloLGS Nerd Font",
+  "terminal": {
+    "font_family": "MesloLGS Nerd Font"
+  }
 }
