@@ -39,7 +39,6 @@ packages=(
     "tldr"
     "tmux"
     "tree"
-    "tree-sitter-cli"
     "ufw"
     "universal-ctags"
     "vim"
@@ -251,6 +250,9 @@ rm -f lazygit.tar.gz lazygit-checksums.txt lazygit
 
 # navi
 cargo install --locked navi
+
+cargo install --locked cargo-binstall
+cargo binstall --no-confirm tree-sitter-cli
 
 # Remove packages
 rm_packages=("nano")
