@@ -46,6 +46,7 @@ export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
      "less"
      "navi"
      "nmap"
+     "ripgrep"
      "shellcheck"
      "ssh-copy-id"
      "telnet"
@@ -53,29 +54,12 @@ export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
      "tmux"
      "trash"
      "tree"
+     "tree-sitter-cli"
      "vim"
      "wget" }}
-{{/* Casks that ship a real sha256 upstream, so they satisfy the --require-sha
-     in HOMEBREW_CASK_OPTS above:
-       claude-code@latest      -- moved out of $casks_no_sha once upstream began
-          publishing a checksum. It is a rolling cask, so the version and its
-          sha256 change every release; brew takes both from the cask definition
-          it just fetched, and nothing about the digest is pinned here. If
-          upstream ever reverts to `:no_check` this install starts failing --
-          which is the point, and better than silently dropping the check.
-       font-meslo-lg-nerd-font -- Ghostty's font (dot_config/ghostty/config.tmpl),
-          and Zed's, and gvim's. */}}
 {{ $casks := list
      "claude-code@latest"
      "font-meslo-lg-nerd-font" }}
-{{/* Casks upstream ships as `sha256 :no_check` -- they cannot satisfy
-     --require-sha, so they are installed in a second pass with that flag
-     dropped. Keep this list as short as possible and re-check with:
-       brew info --cask --json=v2 <token> | jq -r '.casks[].sha256'
-     Anything that gains a real checksum upstream should move to $casks.
-     font-gentium-plus is unlikely ever to: its url is a git repo
-     (github.com/google/fonts.git), not a release archive, so there is no
-     immutable artifact for a checksum to describe. */}}
 {{ $casks_no_sha := list
      "font-gentium-plus" }}
 
