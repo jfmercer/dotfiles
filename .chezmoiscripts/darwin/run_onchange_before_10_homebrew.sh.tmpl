@@ -64,16 +64,9 @@ export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
      dropped. Keep this list as short as possible and re-check with:
        brew info --cask --json=v2 <token> | jq -r '.casks[].sha256'
      Anything that gains a real checksum upstream should move to $casks. */}}
-{{/* font-menlo-for-powerline is kept pending a decision, NOT because something
-     needs it. Every macOS consumer moved to MesloLGS Nerd Font in this change
-     (Ghostty, Zed, gvim's guifont, both terminal/*.terminal profiles). The last
-     reference left in the tree is terminal/MATE.terminal, and that is a Linux
-     dconf dump which a macOS cask cannot serve anyway. Retire it or keep it
-     deliberately -- do not leave this comment as the only reason. */}}
 {{ $casks_no_sha := list
      "claude-code@latest"
-     "font-gentium-plus"
-     "font-menlo-for-powerline" }}
+     "font-gentium-plus" }}
 
 brew bundle --file=/dev/stdin <<EOF
 {{ range ($brews | sortAlpha | uniq) }}
