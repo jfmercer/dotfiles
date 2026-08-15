@@ -4,8 +4,49 @@ set -eufo pipefail
 
 # vim-plug itself is installed via .chezmoiexternal.yaml
 
-# NOTE: plugin install fails on pwnbox, and not even the gods know why
-# See https://github.com/junegunn/vim-plug/wiki/tips#install-plugins-on-the-command-line
-vim -es -u "$HOME/.vimrc" -i NONE -c "PlugInstall --sync" -c "qa"
+# `vim -es` reads Ex commands from stdin. vim-plug clones plugins as background
+# jobs and, under `--sync`, waits for them in a `while ... sleep 100m` loop (see
+# s:update_impl in plug.vim) -- and every one of those sleeps polls stdin. An
+# stdin already at EOF ends the Ex session right there: vim kills the in-flight
+# git clones, silently skips the remaining -c commands, and exits *0*. Nothing
+# installed, nothing printed, and `set -e` none the wiser.
+#
+# That is exactly the stdin chezmoi hands a script when it is not attached to a
+# terminal -- CI, and the documented curl|bash bootstrap. Run by hand it
+# inherits the tty, stdin never reaches EOF, and it works. Hence a bug that
+# looked machine-specific and unknowable rather than simply deterministic.
+#
+# The `E31: No such mapping` the old comment gestured at is a red herring:
+# plug.vim's s:prepare does `silent! unmap <buffer> <cr>`, which sets v:errmsg
+# without raising anything. It is just the last message left lying around, and
+# the first thing you find in a post-mortem.
+#
+# So hand vim a stdin that stays open and never delivers anything: a FIFO held
+# read-write on fd 9. Unlinked immediately -- the open descriptor keeps it
+# alive -- and with no background writer process to reap.
+tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/vim-plug.XXXXXX")"
+trap 'rm -rf "$tmpdir"' EXIT
+mkfifo "$tmpdir/stdin"
+exec 9<>"$tmpdir/stdin"
+
+vim -es -u "$HOME/.vimrc" -i NONE -c "PlugInstall --sync" -c "qa" <&9
+
+# vim exits 0 whether or not it got that far, so the status above proves
+# nothing. Ask a fresh instance what actually landed on disk instead: g:plugs
+# is the vimrc's own plugin list, so this stays correct as plugins are added.
+vim -es -u "$HOME/.vimrc" -i NONE \
+  -c "call writefile(sort(keys(filter(copy(g:plugs), '!isdirectory(v:val.dir)'))), '$tmpdir/missing')" \
+  -c "qa" <&9
+
+if [ ! -f "$tmpdir/missing" ]; then
+  echo "vim-plug: vim quit before it could report plugin state" >&2
+  exit 1
+fi
+
+if [ -s "$tmpdir/missing" ]; then
+  echo "vim-plug: PlugInstall left these plugins uninstalled:" >&2
+  sed 's/^/  /' "$tmpdir/missing" >&2
+  exit 1
+fi
 
 {{- end -}}
