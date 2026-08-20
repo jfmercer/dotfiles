@@ -13,11 +13,28 @@ onboarding = false
 
 [theme]
 # tmux uses themepack powerline/default/blue, which has no herdr equivalent;
-# catppuccin (herdr's default) instead, following the host light/dark mode.
+# catppuccin (herdr's default) instead.
 name = "catppuccin"
-auto_switch = true
-dark_name = "catppuccin"
-light_name = "catppuccin-latte"
+
+# auto_switch is deliberately OFF, and must stay off on this setup.
+#
+# It does not read macOS's AppleInterfaceStyle -- it probes the *host terminal*
+# for its appearance and picks dark_name or light_name from the answer. herdr
+# 0.8.2 made that probe run again on every focus return ("Host terminal
+# appearance is re-queried when focus returns", #2416/#2417); before that it was
+# effectively asked once and stuck on dark, which is the only reason this key
+# ever looked harmless. The upgrade landed at 08:23 on 2026-08-20 but the server
+# from two days earlier kept the old binary in memory, so nothing changed until
+# the reboot at 15:43 restarted it -- at which point the whole UI chrome came up
+# in catppuccin-latte (top bar #eff1f5, tab bar #ccd0da, accent #1e66f5) against
+# an unchanged dark Molokai pane. It reads as "everything went white".
+#
+# The probe is wrong here, but there is also nothing for it to be right about:
+# this Mac is pinned to Dark (AppleInterfaceStyle=Dark, no automatic switching)
+# and dot_config/ghostty/config.tmpl sets a single unconditional dark theme
+# (Molokai), with no light variant. A host-appearance follower can therefore
+# only ever mis-fire. Set the theme outright and let it be.
+auto_switch = false
 
 [keys]
 # tmux: set -g prefix C-a
