@@ -73,9 +73,17 @@
     autoSetupRemote = true
 {{- if get . "work" }}
 
+# Work machines only. Personal machines keep git's built-in default (master),
+# so this is deliberately inside the guard rather than a top-level setting.
+# Only affects repositories created by `git init` from here on -- existing
+# ones, this repo included, keep whatever branch they already have.
+[init]
+    defaultBranch = main
+
 # Work machines only. Employer-specific settings (internal host names, URL
 # rewrites) live in an untracked file so they stay out of this public repo.
 # Create it by hand; git silently ignores the include if it does not exist.
+# Kept last so anything in it overrides the settings above.
 [include]
     path = ~/.gitconfig.work
 {{- end }}
