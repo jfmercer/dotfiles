@@ -110,6 +110,21 @@ write_config() {
     assert_output_lacks ".gitconfig.work"
 }
 
+@test "gitconfig sets init.defaultBranch=main on a work machine only" {
+    # Both halves matter. Hoisting this out of the work guard would silently
+    # change what `git init` produces on personal machines, and nothing else
+    # here would notice -- the setting only shows up in repos created later.
+    write_config "$BATS_TEST_TMPDIR/work.yaml" 'email: "a@b.c"' 'work: true'
+    run render_with "$BATS_TEST_TMPDIR/work.yaml" "$REPO_ROOT/dot_gitconfig.tmpl"
+    assert_success
+    assert_output_contains "defaultBranch = main"
+
+    write_config "$BATS_TEST_TMPDIR/home.yaml" 'email: "a@b.c"' 'work: false'
+    run render_with "$BATS_TEST_TMPDIR/home.yaml" "$REPO_ROOT/dot_gitconfig.tmpl"
+    assert_success
+    assert_output_lacks "defaultBranch"
+}
+
 @test "gitconfig renders when 'work' is absent from the data map entirely" {
     # THE regression this file's `get . "work"` exists for. chezmoi reads the
     # generated ~/.config/chezmoi/chezmoi.yaml, not the .tmpl, so a machine
