@@ -30,7 +30,8 @@ Usage:
   bump-deps                    Report every pin: class, current, latest, status
   bump-deps --check            Terse; exit 1 if anything needs action (CI mode)
   bump-deps --apply            Bump VERSION and ACTION pins; confirm each EXTERNAL
-  bump-deps --apply --externals-all   ... without per-external confirmation
+  bump-deps --apply -y         ... unattended: no per-external confirmation
+                               (-y, --yes and --externals-all are the same flag)
   bump-deps --only NAME        Restrict to one pin (repeatable)
   bump-deps --accept NAME      Accept a changed CONTENT pin
   bump-deps --self-test        Prove the in-place editing rewrites only what it
@@ -887,7 +888,15 @@ def main() -> int:
     )
     ap.add_argument("--check", action="store_true", help="terse; exit 1 if action needed")
     ap.add_argument("--apply", action="store_true", help="bump VERSION/ACTION pins and confirmed EXTERNALs")
-    ap.add_argument("--externals-all", action="store_true", help="skip per-external confirmation")
+    # Aliases, not a second flag: argparse takes the dest from the first long
+    # option, so all three land in args.externals_all and there is one code path.
+    ap.add_argument(
+        "--externals-all",
+        "--yes",
+        "-y",
+        action="store_true",
+        help="skip per-external confirmation (run --apply unattended)",
+    )
     ap.add_argument("--only", action="append", default=[], metavar="NAME", help="restrict to one pin")
     ap.add_argument("--accept", action="append", default=[], metavar="NAME", help="accept a CONTENT change")
     ap.add_argument("--self-test", action="store_true", help="verify in-place editing is surgical")
