@@ -73,6 +73,8 @@ Pins are spread across four files and Dependabot reads none of them. `bin/bump-d
 bump-deps            # status table: class, current, latest
 bump-deps --check    # terse; exit 1 if action needed (what CI runs)
 bump-deps --apply    # bump versions; confirm each external individually
+bump-deps --apply -y   # ... unattended; skip the per-external prompt
+                       # (-y, --yes, --externals-all are one flag, not three)
 bump-deps --self-test  # prove the in-place editing is surgical
 ```
 
@@ -82,7 +84,7 @@ bump-deps --self-test  # prove the in-place editing is surgical
 |-------|-------|---------------|
 | `VERSION` | `install.sh`, `ci.yaml`, linux installs | Latest stable release. Automatic. |
 | `ACTION` | `ci.yaml`, `deps.yaml` | A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment. Resolves the latest release's tag to its commit and rewrites **both halves together**. Automatic. |
-| `EXTERNAL` | `.chezmoiexternal.yaml` (14) | Move to master HEAD, recompute checksum. Confirmed per entry, because it pulls upstream code nobody has read. |
+| `EXTERNAL` | `.chezmoiexternal.yaml` (14) | Move to master HEAD, recompute checksum. Confirmed per entry, because it pulls upstream code nobody has read — `-y` (aka `--yes`, `--externals-all`) waives that prompt for the whole run. |
 | `CONTENT` | `RUSTUP_INIT_SHA256` | A hash over an *unversioned* URL. A change means upstream rewrote the installer — a trust decision, so it needs `--accept rustup`. |
 | `ANCHOR` | `EZA_KEY_FPR`, `CHARM_KEY_FPR` | A GPG public-key fingerprint. **Never rewritten automatically.** A mismatch is key rotation or an attack; verify against upstream's own announcement and edit by hand. `CHARM_KEY_FPR` (Charm's apt repo, for glow) carries an expiry of 2027-07-13, so it *will* rotate on schedule — unlike eza's. |
 
