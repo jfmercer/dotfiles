@@ -167,6 +167,39 @@ retire_remote_branch() {
     assert_equal "$(branches)" "$(printf 'master\ntopic-a')"
 }
 
+@test "deletes a rebase-merged branch that was pushed without an upstream" {
+    # `git push origin <branch>` -- the explicit refspec, which is what `gh pr
+    # create` and every push-by-name does -- sets no branch.<name>.merge, and
+    # push.autoSetupRemote does not apply to it. So git never marks this branch
+    # [gone], and the earlier [gone]-only test kept it forever. Note the absent
+    # `-u` below: it is the entire point of this test.
+    add_remote
+    git checkout -q -b topic-a
+    commit_file work
+    git push -q origin topic-a
+    rebase_merge topic-a
+    retire_remote_branch topic-a
+
+    run "$GDLM"
+    assert_success
+    assert_equal "$(branches)" "master"
+}
+
+@test "keeps a branch pushed without an upstream whose remote branch still exists" {
+    # The other half: dropping the [gone] check must not degrade into deleting
+    # anything patch-identical. This branch has landed but its remote copy is
+    # still there, so it stays.
+    add_remote
+    git checkout -q -b topic-a
+    commit_file work
+    git push -q origin topic-a
+    rebase_merge topic-a
+
+    run "$GDLM"
+    assert_success
+    assert_equal "$(branches)" "$(printf 'master\ntopic-a')"
+}
+
 @test "keeps an abandoned branch that is gone from the remote but never landed" {
     add_remote
     git checkout -q -b topic-a
@@ -196,7 +229,7 @@ retire_remote_branch() {
 
     run "$GDLM" --dry-run
     assert_success
-    assert_output_contains "would delete: topic-a (merged upstream, remote branch gone)"
+    assert_output_contains "would delete: topic-a (merged upstream, no remote branch)"
     assert_output_contains "would delete: topic-b (already merged into HEAD)"
     assert_output_contains "would keep:   wip (not merged)"
     assert_equal "$(branches)" "$(printf 'master\ntopic-a\ntopic-b\nwip')"

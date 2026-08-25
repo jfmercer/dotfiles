@@ -14,19 +14,27 @@
 #      what a merge-commit workflow leaves behind. Deleted with `git branch -d`.
 #
 #   2. Every one of its commits is already upstream as a patch-identical commit
-#      (`git cherry`), AND its remote-tracking branch is gone. This repo is
+#      (`git cherry`), AND it has no remote-tracking branch. This repo is
 #      rebase-merge only -- GitHub has allow_squash_merge and allow_merge_commit
 #      off -- so merging replays a branch onto master under new SHAs and its tip
 #      is never an ancestor of anything. Case 1 alone can therefore never fire
 #      here, which is why this script sat broken for years without it being
 #      obvious that it was inert as well as buggy.
 #
-#      Both signals are required. Patch identity says the work landed; the gone
-#      remote branch says you are done with it. Either one alone is ambiguous:
-#      a branch you abandoned and deleted on the remote is gone without having
-#      landed, and a merged branch whose remote copy still exists may still be
-#      wanted. git regards these as unmerged, so they need `git branch -D` --
-#      run -n first to see what that would do.
+#      Both signals are required. Patch identity says the work landed; the
+#      absent remote branch says you are done with it. Either one alone is
+#      ambiguous: a branch you abandoned and deleted on the remote is gone
+#      without having landed, and a merged branch whose remote copy still
+#      exists may still be wanted. git regards these as unmerged, so they need
+#      `git branch -D` -- run -n first to see what that would do.
+#
+#      Do not narrow the second signal back to `%(upstream:track)` = [gone].
+#      That is only ever set for a branch with a *configured upstream*, and
+#      `git push origin <branch>` -- an explicit refspec, which is what pushing
+#      by name does -- configures none, nor does push.autoSetupRemote apply to
+#      it. Such a branch is pushed, merged and then pruned by `fetch.prune`
+#      without git ever recording anything about it on the local ref, so it
+#      read as "remote branch still exists" and was silently kept forever.
 
 usage() {
     echo "usage: git-delete-local-merged [-n|--dry-run] [branch...]"
@@ -98,19 +106,32 @@ classify() {
     else
         patched=0
     fi
-    if [ "$(git for-each-ref --format='%(upstream:track)' "refs/heads/$1")" = "[gone]" ]; then
-        gone=1
-    else
+    # Two ways to have no counterpart on a remote, and only one of them leaves a
+    # mark on the branch itself. With an upstream configured, git tracks its
+    # disappearance as [gone]; without one, the only evidence is the absence of
+    # a remote-tracking ref, so ask about that ref directly.
+    tracked=$(git for-each-ref --format='%(upstream)' "refs/heads/$1")
+    if [ -n "$tracked" ]; then
+        if [ "$(git for-each-ref --format='%(upstream:track)' "refs/heads/$1")" = "[gone]" ]; then
+            gone=1
+        else
+            gone=0
+        fi
+    elif [ -n "$(git for-each-ref --format='%(refname)' "refs/remotes/*/$1")" ]; then
         gone=0
+    else
+        gone=1
     fi
 
     if [ "$patched" -eq 1 ] && [ "$gone" -eq 1 ]; then
         action=delete_force
-        reason="merged upstream, remote branch gone"
+        reason="merged upstream, no remote branch"
     elif [ "$patched" -eq 1 ]; then
         action=keep
         reason="merged upstream, but its remote branch still exists"
-    elif [ "$gone" -eq 1 ]; then
+    elif [ "$gone" -eq 1 ] && [ -n "$tracked" ]; then
+        # A branch that was never pushed at all is "gone" too, but saying so
+        # about one would bury what the reader cares about: it is not merged.
         action=keep
         reason="gone from the remote, but its commits are not upstream"
     else
