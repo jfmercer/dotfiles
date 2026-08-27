@@ -1,10 +1,23 @@
 name: 'Dependency staleness'
 
-# Pins live in four files with no shared mechanism and Dependabot reads none of
-# them, so nothing would otherwise tell us they have drifted. This reports; it
-# never commits. Bumping stays a deliberate act (`bin/bump-deps --apply`),
-# because bumping the externals pulls upstream code that gets sourced into every
-# interactive shell and tmux session.
+# Pins live in five files with no shared mechanism and Dependabot reads none of
+# them, so nothing would otherwise tell us they have drifted. `bin/bump-deps
+# --check` runs weekly and the result is split by pin class, because the classes
+# are not interchangeable:
+#
+#   VERSION / ACTION / EXTERNAL   `--apply -y` on a branch, offered as a pull
+#                                 request. These rewrites are mechanical, so the
+#                                 diff is the review.
+#   CONTENT / ANCHOR / invariant  the tracking issue. `bump-deps` deliberately
+#                                 refuses to rewrite a GPG fingerprint or an
+#                                 unversioned installer's hash, so a PR for one
+#                                 would be empty -- routing them down the PR
+#                                 path would silently drop the alert.
+#
+# It opens a PR; it never merges one, and it never pushes to master. Bumping the
+# externals pulls upstream code that gets sourced into every interactive shell
+# and tmux session, which is why the compare URLs in the PR body are the point
+# of the exercise rather than decoration.
 on:
   schedule:
     # Mondays, 08:00 UTC. Cron in GitHub Actions is best-effort, not punctual.
@@ -14,12 +27,21 @@ on:
 permissions:
   contents: read
 
+env:
+  # One long-lived branch and one PR, mirroring the single tracking issue: a job
+  # that opens a fresh PR every Monday builds a queue nobody reads. It is
+  # force-pushed from that run's master each week, so it never carries a stale
+  # base or a bump that has since been superseded.
+  BUMP_BRANCH: deps/bump-pins
+
 jobs:
   check:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # This job opens, edits and closes the single tracking issue below.
+      # The GITHUB_TOKEN's only write is the tracking issue. The branch and the
+      # PR are written with DEPS_PR_TOKEN instead -- see that step for why -- so
+      # this job never needs contents: write or pull-requests: write.
       issues: write
     steps:
       # Pinned to a commit, not the v7.0.1 tag, for the reason .chezmoiexternal.yaml
@@ -27,7 +49,8 @@ jobs:
       # lets zizmor check this pin's provenance at all -- see CLAUDE.md.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Don't leave the token in .git/config after checkout.
+          # Don't leave the token in .git/config after checkout. The push below
+          # authenticates through a credential helper instead.
           persist-credentials: false
 
       - name: Check pins
@@ -37,24 +60,55 @@ jobs:
         run: |
           set +e
           python3 bin/bump-deps --check > /tmp/report.txt 2>&1
-          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          rc=$?
+          set -e
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
           cat /tmp/report.txt
-          # Flag security-relevant classes separately: a rotated GPG fingerprint
-          # or a rewritten unversioned installer is not a routine update.
+
+          # 0 is "all current", 1 is "action needed"; anything else is bump-deps
+          # failing to look, not a report about pins. Fail here rather than fall
+          # through: every step below is gated on an output this run never
+          # produced, so the job would otherwise go green having neither opened
+          # anything nor checked anything -- and would then close last week's
+          # issue on the strength of a report that does not exist.
+          if [ "$rc" != 0 ] && [ "$rc" != 1 ]; then
+            echo "::error::bin/bump-deps --check exited $rc; the output above is an error, not a staleness report"
+            exit "$rc"
+          fi
+
+          # Split the report by what `--apply` can actually fix. `--check` prints
+          # one "{status}: {name} ({class}) ..." line per actionable pin, plus
+          # "invariant: ..." for a cross-file violation; `stale` and `behind` are
+          # the VERSION, ACTION and EXTERNAL classes.
+          if grep -qE '^(stale|behind):' /tmp/report.txt; then
+            echo "bumpable=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Everything else needs a human: a rotated GPG fingerprint or a
+          # rewritten unversioned installer is a trust decision, `unverifiable`
+          # means the check could not run at all, and an invariant violation is
+          # a contradiction between two files. `--apply -y` would leave every
+          # one of them untouched.
+          if grep -qE '^(ROTATED|CHANGED|unverifiable):|^invariant:' /tmp/report.txt; then
+            echo "manual=true" >> "$GITHUB_OUTPUT"
+          fi
           if grep -qE '^(ROTATED|CHANGED):' /tmp/report.txt; then
             echo "security=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Deliberately ahead of the bump: a rotated key must be reported even if
+      # the steps below fail. A `--apply` that dies would otherwise skip this
+      # step and swallow the one finding here that is genuinely urgent.
       - name: Open or update the tracking issue
-        if: steps.check.outputs.rc != '0'
+        if: steps.check.outputs.manual == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SECURITY: ${{ steps.check.outputs.security }}
+          BUMPABLE: ${{ steps.check.outputs.bumpable }}
         run: |
           if [ "$SECURITY" = "true" ]; then
             title="Dependency check: integrity pin changed — review before bumping"
           else
-            title="Dependency check: pins are stale"
+            title="Dependency check: pins need a human decision"
           fi
 
           # This group writes Markdown into the issue body, so the backticks
@@ -63,7 +117,7 @@ jobs:
           # the compound command rather than repeated on each echo.
           # shellcheck disable=SC2016
           {
-            echo "\`bin/bump-deps --check\` reported work to do on $(date -u +%Y-%m-%d)."
+            echo "\`bin/bump-deps --check\` found pins that \`--apply\` will not touch, on $(date -u +%Y-%m-%d)."
             echo
             echo '```'
             cat /tmp/report.txt
@@ -77,12 +131,20 @@ jobs:
               echo '> deliberately refuses to rewrite it.'
               echo
             fi
+            if [ "$BUMPABLE" = "true" ]; then
+              echo 'The routine `VERSION`/`ACTION`/`EXTERNAL` bumps in the report above are'
+              echo 'already in a pull request; only the lines this workflow cannot act on'
+              echo 'need you here.'
+              echo
+            fi
             echo 'To act on this:'
             echo
             echo '```bash'
-            echo 'bump-deps            # full table'
-            echo 'bump-deps --apply    # bump versions; confirm each external'
+            echo 'bump-deps                      # full table'
+            echo 'bump-deps --accept <name>      # accept a reviewed CONTENT change'
             echo '```'
+            echo
+            echo 'An `ANCHOR` mismatch and an invariant violation are both edited by hand.'
             echo
             echo "_Updated by \`.github/workflows/deps.yaml\`._"
           } > /tmp/body.md
@@ -99,16 +161,161 @@ jobs:
             gh issue create --title "$title" --body-file /tmp/body.md --label dependencies
           fi
 
-      - name: Close the tracking issue when everything is current
-        if: steps.check.outputs.rc == '0'
+      # Not gated on rc, which the guard above has already narrowed to 0 or 1: a
+      # stale-pins issue left over from before this workflow opened PRs is
+      # superseded by one, and should close rather than sit beside it saying the
+      # same thing.
+      - name: Close the tracking issue when nothing needs a human
+        if: steps.check.outputs.manual != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RC: ${{ steps.check.outputs.rc }}
         run: |
+          if [ "$RC" = "0" ]; then
+            comment="All pins current; closing."
+          else
+            comment="Nothing here needs a human decision; the routine bumps are in a pull request. Closing."
+          fi
           existing=$(gh issue list --state open --label dependencies \
                        --json number --jq '.[0].number' 2>/dev/null || true)
           if [ -n "$existing" ] && [ "$existing" != "null" ]; then
-            gh issue close "$existing" --comment "All pins current; closing."
+            gh issue close "$existing" --comment "$comment"
             echo "closed issue #$existing"
           else
-            echo "all pins current, no open issue"
+            echo "nothing for a human, no open issue"
           fi
+
+      - name: Bump the pins
+        id: bump
+        if: steps.check.outputs.bumpable == 'true'
+        env:
+          # bump-deps only reads the API here -- latest releases, tags resolved
+          # to commits, archives fetched to be checksummed -- so the job's own
+          # read-only token covers it. The PAT stays confined to the next step.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          git switch -c "$BUMP_BRANCH"
+
+          # -y waives the per-external confirmation, which is the one thing
+          # `--apply` normally stops to ask about. Unattended is the whole point
+          # here; the compare URLs it prints are copied into the PR body below so
+          # the reading of upstream's diff still happens, just at review time.
+          #
+          # chezmoi is deliberately not installed for this: bump-deps' own
+          # verification step shells out to `chezmoi apply --dry-run
+          # --refresh-externals`, which resolves the source directory from
+          # ~/.local/share/chezmoi rather than this checkout, so it would verify
+          # the wrong tree. The `apply` job in CI fetches every external against
+          # its new checksum for real, on the PR this creates.
+          python3 bin/bump-deps --apply -y 2>&1 | tee /tmp/apply.txt
+
+          # A pin that goes current between `--check` and `--apply`, or an
+          # external that could not be fetched, leaves nothing to push. Not an
+          # error, but there is no PR to make either.
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "bump-deps reported stale pins but rewrote nothing; no PR to open"
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          {
+            echo 'Bump dependencies'
+            echo
+            echo 'Applied by .github/workflows/deps.yaml.'
+            echo
+            grep -E '^(stale|behind):' /tmp/report.txt
+          } > /tmp/commit.txt
+          git commit --all --file /tmp/commit.txt
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push the branch and open the pull request
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          # Not GITHUB_TOKEN, and not for want of permissions: GitHub refuses to
+          # fire `pull_request` workflows for anything the GITHUB_TOKEN creates,
+          # so a PR opened with it arrives with no checks at all. On a bump that
+          # is the whole review -- CI is what catches an external whose checksum
+          # does not match what upstream now serves (the `apply` job) or an
+          # action SHA zizmor rejects (the `workflows` job).
+          #
+          # A fine-grained PAT scoped to this repository alone, needing three
+          # permissions and no more:
+          #
+          #   Contents: write        push the branch
+          #   Pull requests: write   open, edit and label the PR
+          #   Workflows: write       bump-deps rewrites the ACTION pins inside
+          #                          .github/workflows/, and GitHub rejects a
+          #                          push touching a workflow file from a token
+          #                          without it -- with an error about scopes
+          #                          that names neither this workflow nor which
+          #                          file it objected to.
+          #
+          # Fine-grained PATs expire. A red job here is as likely to be an
+          # expired token as a real failure, so check that first.
+          DEPS_PR_TOKEN: ${{ secrets.DEPS_PR_TOKEN }}
+          GH_TOKEN: ${{ secrets.DEPS_PR_TOKEN }}
+        run: |
+          if [ -z "$DEPS_PR_TOKEN" ]; then
+            echo "::error::DEPS_PR_TOKEN is not set, so the bump cannot be pushed. Create a fine-grained PAT on this repository with Contents: write, Pull requests: write and Workflows: write, and store it as the DEPS_PR_TOKEN Actions secret."
+            exit 1
+          fi
+
+          # Authenticate the push without writing the token into .git/config --
+          # which is what persist-credentials: false above is for -- and without
+          # putting it on a command line, where anything else on the runner could
+          # read it out of argv. git expands $DEPS_PR_TOKEN itself, out of this
+          # step's environment, at the moment the helper runs; hence the single
+          # quotes, and hence SC2016.
+          # shellcheck disable=SC2016
+          git config credential.helper \
+            '!f() { echo username=x-access-token; echo "password=$DEPS_PR_TOKEN"; }; f'
+          git push --force origin "HEAD:refs/heads/$BUMP_BRANCH"
+
+          # shellcheck disable=SC2016
+          {
+            echo "\`bin/bump-deps --apply -y\`, run by \`.github/workflows/deps.yaml\` on $(date -u +%Y-%m-%d)."
+            echo
+            echo '### What was stale'
+            echo
+            echo '```'
+            grep -E '^(stale|behind):' /tmp/report.txt
+            echo '```'
+            echo
+            echo '### What it did'
+            echo
+            echo '```'
+            cat /tmp/apply.txt
+            echo '```'
+            echo
+            echo 'Reviewing this means reading the `compare` URLs above. An `EXTERNAL` bump'
+            echo 'moves a zsh or tmux plugin to upstream master and recomputes its checksum,'
+            echo 'so the diff here is two opaque hex strings standing in for code that gets'
+            echo 'sourced into every interactive shell and tmux session. `VERSION` and'
+            echo '`ACTION` pins are release-to-release and read as themselves.'
+            echo
+            echo 'CI runs on this PR, which is the only thing that verifies the new external'
+            echo 'checksums against what upstream actually serves.'
+            echo
+            echo "_Force-pushed to \`$BUMP_BRANCH\` each week. Never merged automatically._"
+          } > /tmp/pr.md
+
+          title='Bump pinned dependencies'
+          existing=$(gh pr list --head "$BUMP_BRANCH" --base master --state open \
+                       --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+            gh pr edit "$existing" --title "$title" --body-file /tmp/pr.md
+            echo "updated PR #$existing"
+          else
+            gh pr create --base master --head "$BUMP_BRANCH" \
+              --title "$title" --body-file /tmp/pr.md
+            existing=$(gh pr list --head "$BUMP_BRANCH" --base master --state open \
+                         --json number --jq '.[0].number')
+            echo "opened PR #$existing"
+          fi
+          # Best-effort: the label is cosmetic, and a token provisioned without
+          # enough to set it should not turn a successful bump into a red job.
+          gh pr edit "$existing" --add-label dependencies \
+            || echo "note: could not add the dependencies label"

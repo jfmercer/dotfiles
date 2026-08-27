@@ -92,7 +92,34 @@ It also asserts cross-file invariants, notably that **`.chezmoiversion` must not
 
 It also requires that **every `*_KEY_FPR` in the linux installs script is registered in `ANCHOR_PINS`**. The fingerprint in the script only blocks a bad key at install time; it is the `ANCHOR_PINS` entry that makes `deps.yaml` fetch the live key weekly and report a rotation. Those live in two files, so before this check an unregistered pin was simply never watched — while the report went on listing every anchor it *did* know as `current`. Precisely the `deps.yaml` failure below, one pin class over: a staleness detector certifying something it had never read.
 
-`.github/workflows/deps.yaml` runs `--check` weekly and keeps a single tracking issue in sync. It never commits — bumping stays deliberate.
+#### The weekly job — `.github/workflows/deps.yaml`
+
+It runs `--check` every Monday and then **splits the report by pin class**, because the classes are not interchangeable:
+
+| What `--check` reported | Where it goes |
+|---|---|
+| `stale:` / `behind:` — the `VERSION`, `ACTION` and `EXTERNAL` classes | `--apply -y` on the `deps/bump-pins` branch, pushed as a **pull request**. These rewrites are mechanical, so the diff is the review. |
+| `ROTATED:` / `CHANGED:` / `unverifiable:` / `invariant:` | The single tracking issue, as before. `bump-deps` deliberately refuses to rewrite a GPG fingerprint or an unversioned installer's hash, so a PR for one would be an empty diff — and routing them down the PR path would silently drop the alert. |
+
+Both can fire in the same run; they are independent. The issue step is deliberately ordered **before** the bump, so a `--apply` that dies cannot swallow a key rotation on its way out. And `--check` exiting anything other than 0 or 1 fails the job on the spot: that is `bump-deps` failing to *look*, not a report about pins, and every step below is gated on an output such a run never produced — so the job would otherwise go green having opened nothing, and then close last week's issue on the strength of a report that does not exist.
+
+It opens a PR; it never merges one, and it never pushes to master. One long-lived branch and one PR, mirroring the single tracking issue — force-pushed from that week's master, because a job that opens a fresh PR every Monday builds a queue nobody reads.
+
+`tests/python/test_bump_deps.py` reads the real workflow and asserts every status `gather()` can emit is matched by exactly one of those two greps. A status in neither would be reported by `--check` — exit 1, job green — and then acted on by nobody, while the close-the-issue step tidied away the previous week's notice on its way past.
+
+**`DEPS_PR_TOKEN` is a fine-grained PAT, and not for want of permissions.** GitHub refuses to fire `pull_request` workflows for anything the `GITHUB_TOKEN` creates, so a PR opened with it arrives with **no checks at all** — and on a bump that is the entire review: CI is what verifies a new external checksum against what upstream now serves (the `apply` job) and what rejects an action SHA zizmor dislikes (the `workflows` job). The token needs three permissions on this repository and no more:
+
+| Permission | For |
+|---|---|
+| Contents: write | pushing the branch |
+| Pull requests: write | opening, editing and labelling the PR |
+| **Workflows: write** | `bump-deps` rewrites the `ACTION` pins *inside* `.github/workflows/`, and GitHub rejects a push touching a workflow file from a token without this — with an error about scopes that names neither the workflow nor the offending file |
+
+The `GITHUB_TOKEN` keeps `contents: read` + `issues: write` and nothing more; it never gains write on the repository's code. Fine-grained PATs expire, so a red job here is as likely to be an expired token as a real failure — check that first. If the secret is missing entirely the job fails loudly with an `::error::` saying exactly what to create, rather than degrading to something quieter.
+
+The push authenticates through a `credential.helper` that echoes `$DEPS_PR_TOKEN` out of the step's environment. That keeps `persist-credentials: false` on the checkout meaningful (no token in `.git/config`) and keeps the token off a command line, where anything else on the runner could read it out of `argv`.
+
+chezmoi is deliberately **not** installed in this job. `bump-deps`' own external verification shells out to `chezmoi apply --dry-run --refresh-externals`, which resolves its source directory from `~/.local/share/chezmoi` rather than the checkout — so it would verify the wrong tree. Absent, it prints "skipping" and returns success; the real check is CI's `apply` job on the PR.
 
 #### Why Actions are hash-pinned, and why the comment is load-bearing
 
