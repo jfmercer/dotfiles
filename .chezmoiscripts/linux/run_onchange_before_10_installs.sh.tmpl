@@ -31,6 +31,12 @@ packages=(
     # default-terminal, nor screen-256color/alacritty/xterm-ghostty. Without
     # this, anything running inside tmux gets an unknown TERM.
     "ncurses-term"
+    # LazyVim (dot_config/nvim) requires Neovim >= 0.11.2. Kali rolling is fine
+    # -- it tracks Debian testing/unstable and carries 0.12.x -- and that is the
+    # only Linux this repo actually targets. On Debian *stable* apt is well
+    # behind the floor (trixie: 0.10.4, bookworm: 0.7.2), so nvim installs but
+    # LazyVim refuses to start with a version error. Install from upstream there.
+    "neovim"
     "nmap"
     "pipx"
     "ripgrep"

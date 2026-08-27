@@ -35,3 +35,16 @@ bin/
 # Hand-applied terminal profiles (dconf dump / Terminal.app plist). Reference
 # material imported manually -- see CLAUDE.md. Not applied to $HOME.
 terminal/
+
+# Tool-written files under a managed directory. Unlike everything above, this is
+# not a source-dir entry: patterns match the *target* path, and this one names a
+# file in $HOME that must never become managed. lazy.nvim rewrites
+# ~/.config/nvim/lazy-lock.json on every :Lazy update, so tracking it would put
+# `chezmoi status` permanently out of sync.
+#
+# Belt-and-braces, not the mechanism: what actually keeps it untracked is that it
+# is never added to the source dir. chezmoi documents .chezmoiignore as matching
+# target paths but does not say whether `chezmoi add` honours it, so this entry's
+# only guaranteed effect is to stop an accidentally-added lockfile from being
+# applied over yours.
+.config/nvim/lazy-lock.json

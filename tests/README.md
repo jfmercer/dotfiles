@@ -168,6 +168,8 @@ put it back:
 | drop `deps.yaml` from `ACTION_PINS`'s `files` | `test_the_second_workflow_is_checked_too` |
 | drop `unverifiable` from `deps.yaml`'s manual-class grep | `test_the_deps_workflow_routes_every_status_it_can_see` |
 | add a status to `gather()` without teaching `deps.yaml` about it | the same test |
+| re-sync `dot_config/nvim/lua/config/{options,keymaps}.lua` from the LazyVim starter | the LazyVim customizations invariant |
+| `chezmoi add ~/.config/nvim/lazy-lock.json` | the lazy.nvim lockfile invariant |
 | add a `*_KEY_FPR` to the linux installs script without registering it in `ANCHOR_PINS` | `test_an_unregistered_key_fingerprint_is_caught`, and `bump-deps --check` |
 | `replace_action_pin`: stop rewriting `m.group(2)` | `bump-deps --self-test`, and 2 `ReplaceActionPin` tests |
 | correct `tests/fixtures/zizmor/canary.yml`'s version comment | the `workflows` job's canary step (CI only) |
