@@ -79,6 +79,16 @@ the code where a bug is either invisible or dangerous:
   so `fixture_repo` carries **both** workflow files and the tests assert across
   them.
 
+  One test here reads the **real** `.github/workflows/deps.yaml` rather than a
+  fixture. That workflow greps `--check`'s output to decide between opening a
+  pull request and opening the tracking issue, and `--check` prints
+  `"{status}: {name} ..."` — two files with nothing else connecting them. A
+  status matched by neither grep would be reported by `--check` (exit 1, job
+  green) and then acted on by nobody, while the close-the-issue step tidied away
+  the previous week's notice on its way past. The test extracts the patterns
+  from the workflow and asserts every status `gather()` can emit lands in
+  exactly one of them.
+
 ## The zizmor canary is CI-only, deliberately
 
 `tests/fixtures/zizmor/canary.yml` is not run by `tests/run`. It is consumed by
@@ -156,6 +166,8 @@ put it back:
 | revert any `actions/checkout` pin in `ci.yaml` to `@v7.0.1` | `test_the_real_repo_satisfies_its_own_invariants` |
 | change the `# v7.0.1` comment beside a checkout SHA to `# v6.0.0` | `bump-deps --check`, and zizmor's `ref-version-mismatch` in CI |
 | drop `deps.yaml` from `ACTION_PINS`'s `files` | `test_the_second_workflow_is_checked_too` |
+| drop `unverifiable` from `deps.yaml`'s manual-class grep | `test_the_deps_workflow_routes_every_status_it_can_see` |
+| add a status to `gather()` without teaching `deps.yaml` about it | the same test |
 | add a `*_KEY_FPR` to the linux installs script without registering it in `ANCHOR_PINS` | `test_an_unregistered_key_fingerprint_is_caught`, and `bump-deps --check` |
 | `replace_action_pin`: stop rewriting `m.group(2)` | `bump-deps --self-test`, and 2 `ReplaceActionPin` tests |
 | correct `tests/fixtures/zizmor/canary.yml`'s version comment | the `workflows` job's canary step (CI only) |

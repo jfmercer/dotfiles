@@ -12,6 +12,7 @@ here requires `gh` to be installed or authenticated.
 
 from __future__ import annotations
 
+import os
 import unittest
 
 from helper import (
@@ -19,6 +20,7 @@ from helper import (
     CHECKOUT_SHA,
     GITLEAKS_SHA,
     LINUX_TMPL,
+    REPO_ROOT,
     SINGLE_GROUP_REGISTRIES,
     bump_deps,
     fixture_repo,
@@ -589,19 +591,57 @@ class Report(unittest.TestCase):
         self.assertEqual(rows[0].status, "unverifiable")
         self.assertIn("gpg missing", rows[0].detail)
 
-    def test_the_deps_workflow_grep_matches_the_status_strings(self):
-        # deps.yaml runs: grep -qE '^(ROTATED|CHANGED):' over --check output, and
-        # --check prints "{status}: {name} ...". This asserts the two agree; they
-        # live in different files with nothing else connecting them.
+    def test_the_deps_workflow_routes_every_status_it_can_see(self):
+        # deps.yaml greps --check's output to choose between opening a pull
+        # request and opening the tracking issue, and --check prints
+        # "{status}: {name} ...". The two live in different files with nothing
+        # else connecting them, so a status matched by neither grep would be
+        # reported by --check -- rc 1, job green -- and then acted on by nobody,
+        # while the close-the-issue step tidied away last week's notice on its
+        # way past. Read the real workflow rather than restating its patterns.
+        import inspect
         import re
 
-        pattern = re.compile(r"^(ROTATED|CHANGED):")
+        workflow = os.path.join(REPO_ROOT, ".github", "workflows", "deps.yaml")
+        with open(workflow, encoding="utf-8") as fh:
+            yaml_text = fh.read()
+        greps = {
+            name: pattern
+            for pattern, name in re.findall(
+                r"grep -qE '([^']+)' /tmp/report\.txt; then\n\s*echo \"(\w+)=true\"",
+                yaml_text,
+            )
+        }
+        self.assertEqual(set(greps), {"bumpable", "manual", "security"}, greps)
+
+        # Every status gather() can put on an actionable row. All but one are
+        # written as `"current" if ... else "X"`; `unverifiable` is the exception,
+        # because a missing gpg leaves nothing to compare against.
+        src = inspect.getsource(bump_deps.gather)
+        statuses = set(re.findall(r'else "([A-Za-z]+)"', src)) | {"unverifiable"}
+        self.assertLessEqual({"stale", "behind", "CHANGED", "ROTATED"}, statuses)
+
+        # Exactly one bucket each: a status in both would open a PR *and* an
+        # issue for the same pin, and one in neither is the silent case above.
+        buckets = {name: re.compile(greps[name]) for name in ("bumpable", "manual")}
+        for status in sorted(statuses):
+            with self.subTest(status=status):
+                line = f"{status}: some-pin (VERSION) aaaa -> bbbb"
+                hit = [name for name, pat in buckets.items() if pat.search(line)]
+                self.assertEqual(len(hit), 1, f"{status!r} routed to {hit}")
+
+        # An invariant violation is neither a version nor a fingerprint, and
+        # --apply cannot fix one: it must reach the issue and never the PR.
+        violation = "invariant: .chezmoiversion (2.99.0) exceeds install.sh"
+        self.assertTrue(buckets["manual"].search(violation))
+        self.assertIsNone(buckets["bumpable"].search(violation))
+
+        # Only the two trust decisions escalate the issue title.
+        security = re.compile(greps["security"])
         for status in ("ROTATED", "CHANGED"):
-            line = f"{status}: eza-key (ANCHOR) AAAA -> BBBB"
-            self.assertTrue(pattern.match(line), line)
-        # And the routine statuses must NOT trip it.
+            self.assertTrue(security.match(f"{status}: eza-key (ANCHOR) AAAA -> BBBB"))
         for status in ("stale", "behind", "unverifiable"):
-            self.assertIsNone(pattern.match(f"{status}: x (VERSION) a -> b"))
+            self.assertIsNone(security.match(f"{status}: x (VERSION) a -> b"))
 
 
 class Registry(unittest.TestCase):
