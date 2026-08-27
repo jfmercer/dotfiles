@@ -276,6 +276,50 @@ load helpers/stub.bash
     }
 }
 
+# ------------------------------------------------------- Neovim / LazyVim
+
+@test "the LazyVim starter keeps its two local customizations" {
+    # dot_config/nvim/ is the LazyVim starter, copied in verbatim except for two
+    # lines. Re-syncing either file from upstream -- the obvious way to pick up a
+    # starter change -- silently reverts both, and nothing complains: nvim just
+    # starts with a space leader and jk types a literal jk. You notice weeks
+    # later. That is the whole reason this test exists; it is not restating the
+    # config, it is pinning the two lines that are ours.
+    local opts="$REPO_ROOT/dot_config/nvim/lua/config/options.lua"
+    local keys="$REPO_ROOT/dot_config/nvim/lua/config/keymaps.lua"
+
+    for f in "$opts" "$keys"; do
+        [ -f "$f" ] || { echo "missing: ${f#"$REPO_ROOT"/}" >&2; return 1; }
+    done
+
+    grep -qE '^vim\.g\.mapleader = ","' "$opts" || {
+        echo "dot_config/nvim/lua/config/options.lua no longer sets mapleader to ','." >&2
+        echo "LazyVim's own options.lua sets it to ' ' and is loaded first, so dropping" >&2
+        echo "this line silently hands the leader key back to LazyVim." >&2
+        return 1
+    }
+
+    grep -qE '^vim\.keymap\.set\("i", "jk", "<Esc>"' "$keys" || {
+        echo "dot_config/nvim/lua/config/keymaps.lua no longer maps jk to <Esc> in insert mode." >&2
+        return 1
+    }
+}
+
+@test "lazy.nvim's lockfile is not tracked" {
+    # lazy.nvim rewrites ~/.config/nvim/lazy-lock.json on every :Lazy update, so
+    # a tracked copy puts `chezmoi status` permanently out of sync -- and the
+    # .chezmoiignore entry cannot be relied on to prevent that, since chezmoi
+    # does not document whether `chezmoi add` honours it. This asserts the thing
+    # that actually holds: the file is absent from the source dir.
+    local lock="$REPO_ROOT/dot_config/nvim/lazy-lock.json"
+    [ ! -e "$lock" ] || {
+        echo "dot_config/nvim/lazy-lock.json is tracked." >&2
+        echo "lazy.nvim rewrites it on every :Lazy update, so chezmoi will report drift forever." >&2
+        echo "Remove it from the source directory; see .chezmoiignore." >&2
+        return 1
+    }
+}
+
 # ------------------------------------------------------------- shell hygiene
 
 @test "no topic file sets TERM unconditionally" {
