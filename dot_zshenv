@@ -26,8 +26,8 @@ export EDITOR="$VISUAL"
 # PAGER stays a bare command, with flags in LESS, because not every caller
 # word-splits $PAGER before exec'ing it -- `PAGER="less -R"` becomes a search
 # for a binary named "less -R" in those. LESS is read by less itself, so -R
-# (pass ANSI color through raw) now applies to every invocation: man, git's
-# delta pipeline, tools that exec less directly. It replaces an
+# (pass ANSI color through raw) now applies to every invocation: man and any
+# other tool that execs less directly. It replaces an
 # `alias less="less -R"`, which only ever covered less typed at a prompt.
 export PAGER="less"
 export LESS="-R"

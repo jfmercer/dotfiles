@@ -10,7 +10,7 @@ A [chezmoi](https://github.com/twpayne/chezmoi)-managed dotfiles repository. The
 
 ```bash
 chezmoi apply          # apply changes from source to home directory
-chezmoi diff           # preview what apply would change (uses delta)
+chezmoi diff           # preview what apply would change (uses hunk)
 chezmoi status         # show what's out of sync between source and $HOME
 chezmoi add <file>     # track a new file from $HOME into this repo
 chezmoi re-add <file>  # pull changes made directly in $HOME back into source

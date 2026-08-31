@@ -191,6 +191,16 @@ VERSION_PINS = [
             },
         ],
     },
+    {
+        # Linux only -- macOS installs hunk from Homebrew, which tracks its own
+        # version. Tagged vX.Y.Z but pinned without the v, like lazygit.
+        "name": "hunk",
+        "file": LINUX,
+        "pattern": r'HUNK_VERSION="([^"]+)"',
+        "repo": "modem-dev/hunk",
+        "occurrences": 1,
+        "strip_v": True,
+    },
 ]
 
 # --------------------------------------------------------------------------

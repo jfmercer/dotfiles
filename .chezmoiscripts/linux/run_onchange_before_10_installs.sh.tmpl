@@ -143,6 +143,7 @@ RUSTUP_VERSION="1.29.1"
 RUSTUP_INIT_SHA256_X86_64="dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
 RUSTUP_INIT_SHA256_AARCH64="15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433"
 LAZYGIT_VERSION="0.64.1"
+HUNK_VERSION="0.20.1"
 
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
 # only set up the apt repo once; re-running is a no-op
@@ -327,6 +328,37 @@ grep " ${LAZYGIT_TARBALL}\$" lazygit-checksums.txt | sed "s|${LAZYGIT_TARBALL}|l
 tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
 rm -f lazygit.tar.gz lazygit-checksums.txt lazygit
+
+# install hunk (git pager; see core.pager in dot_gitconfig.tmpl)
+# macOS gets this from Homebrew. There is no apt package and hunk is not on
+# crates.io, so Linux takes the upstream release tarball -- pinned and verified
+# against the release's own SHA256SUMS, same as lazygit above. Deliberately not
+# `curl https://hunk.dev/install.sh | sh`: that resolves "latest" and executes
+# an unreviewed installer, which is what the rustup handling above exists to
+# avoid.
+# Bump: gh api repos/modem-dev/hunk/releases/latest --jq .tag_name
+if [[ $(arch) == "x86_64" ]]; then
+  HUNK_ARCH="x64"
+else
+  HUNK_ARCH="arm64"
+fi
+HUNK_PKG="hunkdiff-linux-${HUNK_ARCH}"
+HUNK_TARBALL="${HUNK_PKG}.tar.gz"
+HUNK_BASE="https://github.com/modem-dev/hunk/releases/download/v${HUNK_VERSION}"
+curl -fLo hunk.tar.gz "${HUNK_BASE}/${HUNK_TARBALL}"
+curl -fLo hunk-checksums.txt "${HUNK_BASE}/SHA256SUMS"
+grep " ${HUNK_TARBALL}\$" hunk-checksums.txt | sed "s|${HUNK_TARBALL}|hunk.tar.gz|" | sha256sum -c -
+# The tarball is a directory: the binary plus a sibling skills/ tree that hunk
+# resolves relative to itself, so the binary cannot be installed on its own.
+# Mirror Homebrew's layout -- the whole payload in a lib dir, a link on PATH.
+# A symlink is enough (verified: `hunk skill path` resolves correctly through
+# one); unlike Tailscale's CLI, hunk does not need an exec wrapper.
+tar xf hunk.tar.gz "${HUNK_PKG}"
+sudo rm -rf /usr/local/lib/hunk
+sudo mkdir -p /usr/local/lib/hunk
+sudo cp -R "${HUNK_PKG}/." /usr/local/lib/hunk/
+sudo ln -sfn /usr/local/lib/hunk/hunk /usr/local/bin/hunk
+rm -rf hunk.tar.gz hunk-checksums.txt "${HUNK_PKG}"
 
 # navi
 cargo install --locked navi
