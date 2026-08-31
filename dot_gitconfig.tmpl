@@ -43,9 +43,15 @@
     editor = nvim
     ignorecase = false
     # the default is 'less -FRSX'
-    pager = delta --diff-so-fancy
+    pager = hunk pager
     autocrlf = input
 
+# delta is no longer the pager -- hunk is (see core.pager above). It is kept
+# solely for interactive.diffFilter below, because `git add -p` needs a filter
+# that colorizes a diff on stdout and hands it back to git. hunk is a
+# full-screen TUI reviewer with no such stream mode, so it cannot fill that
+# slot. These keys still apply on that path: --color-only drops delta's file
+# header decoration but honors line-numbers.
 [delta]
     navigate = true
     line-numbers = true

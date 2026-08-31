@@ -853,6 +853,7 @@ def current_tag(repo: str) -> str:
         "actions/checkout": "v7.0.1",
         "gitleaks/gitleaks-action": "v3.0.0",
         "jesseduffield/lazygit": "v0.58.0",
+        "modem-dev/hunk": "v0.1.0",
         "bats-core/bats-core": "v1.14.0",
         "zizmorcore/zizmor": "v1.28.0",
         "rhysd/actionlint": "v1.7.12",

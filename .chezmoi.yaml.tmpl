@@ -40,7 +40,10 @@ verbose: false
 diff:
   # exclude:
   #   - scripts
-  pager: "delta --diff-so-fancy | less --tabs=4 -RFX"
+  {{/* hunk pages itself, so there is no `| less` tail here as there was with
+       delta. Note this file is rendered at `chezmoi init` time, so changing
+       this line does nothing on an existing machine until init is re-run. */}}
+  pager: "hunk pager"
 
 # Here we "export" the variables, so we can access them outside this file
 data:
