@@ -13,15 +13,17 @@ alias -- -="cd -"
 # Shortcuts
 alias C="cd ~/Code"
 # Zed for project work (the CLI is symlinked by run_after_20_zed_symlink);
-# vim stays $EDITOR for quick terminal edits -- see `v`/`ev` below.
+# nvim is $EDITOR for quick terminal edits -- see `v`/`ev` below.
 alias c="zed ."
 alias dl="cd ~/Downloads"
 alias dt="cd ~/Desktop"
 alias cdrc="cd $DOTFILES"
 alias erc="zed $DOTFILES"
 alias h="history"
-alias v="vim ."
-alias ev="vim ~/.vimrc"
+alias v="nvim ."
+# 'e'dit '(n)v'im's config. This is the applied copy under ~/.config/nvim, so
+# edits here drift from the chezmoi source -- use `erc` for the tracked tree.
+alias ev="nvim ~/.config/nvim"
 alias o="open"
 alias oo="open ."
 # Force tmux to use 256 color mode

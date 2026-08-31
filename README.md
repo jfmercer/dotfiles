@@ -48,7 +48,21 @@ If that residual trust is not acceptable, clone the repo over SSH and run `./ins
 ### Debug Installation
 Add `DOTFILES_DEBUG=true` to get debug output during the installation.
 
+## nvim
+
+Neovim is the default editor: `$VISUAL`/`$EDITOR`, git's `core.editor`, and the
+`v` / `ev` / `egc` / `egi` aliases all invoke `nvim`. Its config is the
+[LazyVim](https://www.lazyvim.org/) starter in `dot_config/nvim/`, with two
+local changes — the leader is `,` (not LazyVim's space) and `jk` is `ESC` in
+insert mode. `ev` opens the config; project work still happens in Zed
+(`c` / `erc`).
+
 ## vim
+
+Still installed, still configured as below, but nothing points at it by default
+any more — type `vim` to get it. Its config is entirely separate from Neovim's:
+nvim does not read `~/.vimrc`, and `~/.vim` is not on its `runtimepath`.
+
 #### Key Mappings
 
 * `ESC` is now `jk`. This will save your left pinky from a premature death.
@@ -57,7 +71,8 @@ Add `DOTFILES_DEBUG=true` to get debug output during the installation.
 * `,ev` edits your vimrc. The mnemonic is 'e'dit 'v'imrc.
 * `,sv` sources your vimrc. The mnemonic is 's'ource 'v'imrc.
 
-Vim here is for quick terminal edits; project work happens in Zed (`c` / `erc`).
+The `,ev` / `,sv` mappings above are vim's own, and still reach `~/.vimrc`. The
+shell alias `ev` is a different thing: it now opens Neovim's config.
 
 ### Plugins
 

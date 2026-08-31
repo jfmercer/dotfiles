@@ -1,5 +1,5 @@
-alias egc="vim $HOME/.gitconfig"
-alias egi="vim $HOME/.gitignore"
+alias egc="nvim $HOME/.gitconfig"
+alias egi="nvim $HOME/.gitignore"
 alias g="git"
 alias ga="git add"
 alias gaa="git add -A" # Identical to "git add .; git add -u"
