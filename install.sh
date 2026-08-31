@@ -36,7 +36,7 @@ error() {
 # serve an honest installer -- that is unavoidable for a bootstrap -- but pinning
 # means a compromised endpoint cannot silently hand us a different chezmoi than
 # the one this repo was tested against. Bump with: chezmoi --version
-CHEZMOI_VERSION="v2.72.0"
+CHEZMOI_VERSION="v2.72.1"
 
 if ! chezmoi="$(command -v chezmoi)"; then
   bin_dir="${HOME}/.local/bin"
