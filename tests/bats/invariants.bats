@@ -320,6 +320,62 @@ load helpers/stub.bash
     }
 }
 
+@test "every editor hook points at nvim, not vim" {
+    # nvim is the default editor (CLAUDE.md); vim is still installed and still
+    # fully configured, but nothing should default to it. Each entry below is a
+    # separate place that names an editor binary, and a stale `vim` in any one of
+    # them fails silently -- vim still opens, still edits the file, still exits
+    # 0. The only symptom is `git commit` or `secret env-edit` handing you the
+    # wrong editor, which is easy to write off as a shell that needs reloading.
+    #
+    # Enumerated rather than swept for: a repo-wide grep would also hit
+    # dot_vimrc, the vim-plug external and run_onchange_after_100_vim.sh.tmpl,
+    # all of which are meant to keep saying vim.
+    local -a hooks=(
+        'dot_zshenv|^export VISUAL='
+        'dot_gitconfig.tmpl|^[[:space:]]*editor ='
+        'system/alii.zsh|^alias v='
+        'system/alii.zsh|^alias ev='
+        'git/git-alii.zsh|^alias egc='
+        'git/git-alii.zsh|^alias egi='
+        'bin/secret|EDITOR:-'
+    )
+
+    local hook file pattern line found
+    for hook in "${hooks[@]}"; do
+        file="${hook%%|*}"
+        pattern="${hook#*|}"
+
+        found=0
+        while IFS= read -r line; do
+            found=1
+
+            # Not just "mentions nvim": `vim ~/.config/nvim` mentions it too.
+            # Both halves are needed -- nvim present, and no bare `vim` word.
+            case "$line" in
+                *nvim*) ;;
+                *)
+                    echo "$file: editor hook does not name nvim:" >&2
+                    echo "  $line" >&2
+                    return 1
+                    ;;
+            esac
+
+            if printf '%s\n' "$line" | grep -qE '(^|[^[:alnum:]_])vim($|[^[:alnum:]_])'; then
+                echo "$file: editor hook still invokes bare vim:" >&2
+                echo "  $line" >&2
+                return 1
+            fi
+        done < <(grep -E "$pattern" "$REPO_ROOT/$file")
+
+        [ "$found" = 1 ] || {
+            echo "invariants: nothing matches /$pattern/ in $file" >&2
+            echo "The editor hook was renamed or removed; update this test to match." >&2
+            return 1
+        }
+    done
+}
+
 # ------------------------------------------------------------- shell hygiene
 
 @test "no topic file sets TERM unconditionally" {

@@ -17,9 +17,10 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 
-# vim for quick terminal edits and git commit messages; Zed is the GUI editor
-# (see the `c`/`erc` aliases in system/alii.zsh).
-export VISUAL="vim"
+# nvim for quick terminal edits and git commit messages; Zed is the GUI editor
+# (see the `c`/`erc` aliases in system/alii.zsh). vim is still installed and
+# still has its own config, but nothing points at it by default any more.
+export VISUAL="nvim"
 export EDITOR="$VISUAL"
 
 # PAGER stays a bare command, with flags in LESS, because not every caller
