@@ -32,6 +32,30 @@ export EDITOR="$VISUAL"
 export PAGER="less"
 export LESS="-R"
 
+# `hunk pager` (core.pager in dot_gitconfig.tmpl) sniffs its input and only
+# renders its TUI for a diff. Non-diff output -- `git branch`, `git log`
+# without -p -- takes its pass-through path, which spawns `HUNK_TEXT_PAGER ??
+# PAGER` and inherits the environment unchanged. It sets no LESS of its own, so
+# a bare `less` there is governed entirely by the -R above: no -F, and two
+# lines of branches sit in a full-screen pager waiting for `q`. delta never did
+# this because it injects --quit-if-one-screen and --no-init into less's argv
+# itself, the same trick bat uses (see system/exports.zsh).
+#
+# So the flags have to be in argv, where they beat $LESS -- which is why this
+# is the one PAGER-ish variable here carrying its own flags, against the rule
+# stated above. Safe because hunk word-splits the string rather than exec'ing
+# it as one word. -F is quit-if-one-screen, -X is delta's --no-init (leave
+# short output on screen instead of clearing it).
+#
+# HUNK_TEXT_PAGER is undocumented -- not in hunk's README #config section nor
+# anywhere in its docs/ -- and was found by reading the 0.20.1 binary. It is
+# also the ONLY route: the pass-through reads process.env directly, and hunk's
+# config.toml has no key that reaches it (and silently ignores unknown keys, so
+# an invented `text_pager =` there would look right and do nothing). Recheck on
+# a major hunk bump; hunk's own default is `less -R`, missing -F the same way,
+# so this stops being needed only if upstream fixes that.
+export HUNK_TEXT_PAGER="less -FRX"
+
 # PATH is deliberately NOT set here. On macOS /etc/zprofile runs path_helper
 # AFTER this file and rebuilds PATH, demoting anything prepended here --
 # measured: asdf shims move from position 1 to position 13, behind
