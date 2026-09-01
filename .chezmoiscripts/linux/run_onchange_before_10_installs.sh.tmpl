@@ -268,7 +268,15 @@ case "$(uname -m)" in
         ;;
 esac
 
-rustup_init=$(mktemp)
+# The basename is load-bearing, which is why this takes a temp *directory* and
+# names the file inside it rather than using a bare `mktemp`. rustup-init is a
+# multi-call binary: it dispatches on argv[0], and any name other than
+# "rustup-init" is read as the toolchain proxy to forward to. Downloaded to a
+# mktemp path it exits with `unknown proxy name: 'tmp'` -- download fine,
+# checksum verified, nothing wrong but the filename. Upstream's script takes the
+# same precaution, for the same reason.
+rustup_tmp=$(mktemp -d)
+rustup_init="${rustup_tmp}/rustup-init"
 curl --proto '=https' --tlsv1.2 -sSf \
     "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rustup_target}/rustup-init" \
     -o "$rustup_init"
@@ -279,7 +287,7 @@ echo "${rustup_sha256}  ${rustup_init}" | sha256sum -c - || {
     echo "rustup-init checksum mismatch -- refusing to run it." >&2
     echo "archive/${RUSTUP_VERSION}/ is immutable, so this should never drift on" >&2
     echo "its own: treat a mismatch as a supply-chain problem, not a stale pin." >&2
-    rm -f "$rustup_init"
+    rm -rf "$rustup_tmp"
     exit 1
 }
 chmod u+x "$rustup_init"
@@ -287,11 +295,11 @@ chmod u+x "$rustup_init"
 # same wall and says so rather than failing as a bare "permission denied".
 if [ ! -x "$rustup_init" ]; then
     echo "cannot execute $rustup_init (is TMPDIR mounted noexec?)" >&2
-    rm -f "$rustup_init"
+    rm -rf "$rustup_tmp"
     exit 1
 fi
 "$rustup_init" -y
-rm -f "$rustup_init"
+rm -rf "$rustup_tmp"
 # shellcheck source=/dev/null
 source "$HOME/.cargo/env"
 
