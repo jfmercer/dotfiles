@@ -109,7 +109,9 @@ The arch mapping we own is short — `x86_64`/`aarch64`, hard failure otherwise 
 
 One piece of it *is* kept, because `uname -m` alone cannot see it: a **64-bit kernel running a 32-bit userland** still reports `x86_64` or `aarch64`, and the 64-bit binary would die with a bare `Exec format error`. Upstream reads the ELF header of `/proc/self/exe`; `getconf LONG_BIT` answers the same question in one line and comes from `libc-bin`, which is Essential. Only 64-bit builds are pinned here, so that check refuses rather than falling back to `i686`/`armv7` as upstream does.
 
-Two details that look like arbitrary choices and are not:
+**The temp file's basename is load-bearing.** `rustup-init` is a multi-call binary: it dispatches on `argv[0]`, and any name other than `rustup-init` is read as the name of a toolchain proxy to forward to. Downloaded to a bare `mktemp` path it exits with ``unknown proxy name: 'tmp'`` — download fine, checksum verified, nothing wrong but the filename. So the script takes a temp *directory* and puts the binary in it under its real name, as upstream's does. Do not "simplify" that back to `mktemp`.
+
+Two further details that look like arbitrary choices and are not:
 
 - **`bump-deps` computes the hashes from the bytes it downloads, not from upstream's `rustup-init.sha256` sidecar.** The sidecar is a claim served by the same host as the binary, so trusting it would restate the download rather than check it. (They do currently agree; that was verified when this landed.)
 - **The version comes from upstream's `release-stable.toml`, not from `gh`.** `rust-lang/rustup` publishes tags but cuts no GitHub Releases, so `gh api .../releases/latest` returns 404. A test asserts this path never routes back through `latest_release()`.
