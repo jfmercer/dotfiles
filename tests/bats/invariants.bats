@@ -278,26 +278,21 @@ load helpers/stub.bash
 
 # ------------------------------------------------------- Neovim / LazyVim
 
-@test "the LazyVim starter keeps its two local customizations" {
-    # dot_config/nvim/ is the LazyVim starter, copied in verbatim except for two
-    # lines. Re-syncing either file from upstream -- the obvious way to pick up a
-    # starter change -- silently reverts both, and nothing complains: nvim just
-    # starts with a space leader and jk types a literal jk. You notice weeks
-    # later. That is the whole reason this test exists; it is not restating the
-    # config, it is pinning the two lines that are ours.
-    local opts="$REPO_ROOT/dot_config/nvim/lua/config/options.lua"
+@test "the LazyVim starter keeps its one local customization" {
+    # dot_config/nvim/ is the LazyVim starter, copied in verbatim except for a
+    # single line. Re-syncing keymaps.lua from upstream -- the obvious way to
+    # pick up a starter change -- silently drops it, and nothing complains: nvim
+    # just types a literal jk. You notice weeks later. That is the whole reason
+    # this test exists; it is not restating the config, it is pinning the one
+    # line that is ours.
+    #
+    # options.lua is deliberately not checked any more. It used to set mapleader
+    # to "," and this test pinned that. The leader is now " ", which is LazyVim's
+    # own default, so the line was removed rather than left restating upstream --
+    # options.lua is byte-identical to the starter and has nothing left to revert.
     local keys="$REPO_ROOT/dot_config/nvim/lua/config/keymaps.lua"
 
-    for f in "$opts" "$keys"; do
-        [ -f "$f" ] || { echo "missing: ${f#"$REPO_ROOT"/}" >&2; return 1; }
-    done
-
-    grep -qE '^vim\.g\.mapleader = ","' "$opts" || {
-        echo "dot_config/nvim/lua/config/options.lua no longer sets mapleader to ','." >&2
-        echo "LazyVim's own options.lua sets it to ' ' and is loaded first, so dropping" >&2
-        echo "this line silently hands the leader key back to LazyVim." >&2
-        return 1
-    }
+    [ -f "$keys" ] || { echo "missing: ${keys#"$REPO_ROOT"/}" >&2; return 1; }
 
     grep -qE '^vim\.keymap\.set\("i", "jk", "<Esc>"' "$keys" || {
         echo "dot_config/nvim/lua/config/keymaps.lua no longer maps jk to <Esc> in insert mode." >&2
