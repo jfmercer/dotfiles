@@ -24,6 +24,14 @@ alias v="nvim ."
 # 'e'dit '(n)v'im's config. This is the applied copy under ~/.config/nvim, so
 # edits here drift from the chezmoi source -- use `erc` for the tracked tree.
 alias ev="nvim ~/.config/nvim"
+# '(n)vim' as 'view' -- open read-only. Homebrew's neovim ships only the nvim
+# binary, with no counterpart to vim's `view`, so this is the nvim equivalent.
+# `view` itself is deliberately left alone: it belongs to the vim formula and
+# still opens vim, the same as it always did.
+#
+# -R matches what `view` does: it sets 'readonly', so `:w!` can still force a
+# write. Use `nvim -M` instead for a buffer that cannot be modified at all.
+alias nview="nvim -R"
 alias o="open"
 alias oo="open ."
 # Force tmux to use 256 color mode

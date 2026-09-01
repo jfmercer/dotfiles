@@ -52,10 +52,11 @@ Add `DOTFILES_DEBUG=true` to get debug output during the installation.
 
 Neovim is the default editor: `$VISUAL`/`$EDITOR`, git's `core.editor`, and the
 `v` / `ev` / `egc` / `egi` aliases all invoke `nvim`. Its config is the
-[LazyVim](https://www.lazyvim.org/) starter in `dot_config/nvim/`, with two
-local changes — the leader is `,` (not LazyVim's space) and `jk` is `ESC` in
-insert mode. `ev` opens the config; project work still happens in Zed
-(`c` / `erc`).
+[LazyVim](https://www.lazyvim.org/) starter in `dot_config/nvim/`, with one
+local change — `jk` is `ESC` in insert mode. The leader is `<Space>`, which is
+LazyVim's default and so is not set anywhere here. `ev` opens the config;
+project work still happens in Zed (`c` / `erc`). Note vim's leader, below, is
+still `,`.
 
 ## vim
 

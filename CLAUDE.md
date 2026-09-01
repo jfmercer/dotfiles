@@ -255,7 +255,7 @@ Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config
 
 ### Neovim / LazyVim (`dot_config/nvim/`) — the default editor, but separate from vim
 
-`dot_config/nvim/` is the [LazyVim](https://www.lazyvim.org/) starter, copied in from `LazyVim/starter` at commit `803bc181d7c0d6d5eeba9274d9be49b287294d99`, verbatim apart from two lines. `LICENSE`, `README.md` and the starter's `.gitignore` were left behind: the first two are repo boilerplate rather than config, and the third only means anything if `~/.config/nvim` is itself a git repo, which it is not.
+`dot_config/nvim/` is the [LazyVim](https://www.lazyvim.org/) starter, copied in from `LazyVim/starter` at commit `803bc181d7c0d6d5eeba9274d9be49b287294d99`, verbatim apart from one line. `LICENSE`, `README.md` and the starter's `.gitignore` were left behind: the first two are repo boilerplate rather than config, and the third only means anything if `~/.config/nvim` is itself a git repo, which it is not.
 
 **Nothing here is shared with vim, and no vim settings were ported.** `dot_vimrc`, the `.vim/autoload/plug.vim` external and `run_onchange_after_100_vim.sh.tmpl` are untouched, and vim stays in both install lists. The two editors need no guard to stay apart: Neovim does not read `~/.vimrc` and `~/.vim` is not on its `runtimepath` (verified both directions). There is no `nvim` alias because none is needed — `nvim` is the binary's own name.
 
@@ -265,12 +265,17 @@ Note: `dot_config/zed/settings.json` (managed by chezmoi) is Zed's editor config
 
 `~/.config/nvim` previously held an **NvChad** starter clone, installed 31 Jul 2026 and never customized (clean tree against upstream, zero local commits). It was removed to make room for this, so it is not a mystery to rediscover. Note the ordering that mattered: the old config had to go *before* `chezmoi apply`, because apply merges into an existing directory and would otherwise have left NvChad's `lua/chadrc.lua` and `lua/options.lua` sitting beside LazyVim's files — a hybrid that starts and misbehaves instead of failing cleanly.
 
-Two local changes, both asserted by `invariants.bats` because re-syncing either file from upstream reverts them **silently** — nvim simply starts with a space leader and `jk` types a literal `jk`:
+One local change, asserted by `invariants.bats` because re-syncing that file from upstream drops it **silently** — `jk` simply starts typing a literal `jk`:
 
 | Change | File | Why there |
 |---|---|---|
-| `vim.g.mapleader = ","` | `lua/config/options.lua` | LazyVim's `M.load()` (`lua/lazyvim/config/init.lua`) sources `lazyvim.config.options`, which sets the leader to `" "`, and *then* the user's `config.options` — so ours wins. That same `M.load("options")` runs before lazy.nvim sources any plugin spec, which is the condition mapleader has to meet: plugins resolve `<leader>` in their `keys` at map time. It shadows vim's built-in `,` (repeat last `f`/`t` backwards). `maplocalleader` is left at LazyVim's `\`. |
 | `vim.keymap.set("i", "jk", "<Esc>", …)` | `lua/config/keymaps.lua` | LazyVim's docs are explicit that `LazyVim.safe_keymap_set` is internal and must not be used in your own config. Costs a `timeoutlen` wait on a literal `jk` typed in insert mode. |
+
+**The leader is `<Space>`, and nothing here sets it** — that is LazyVim's own default (`lazyvim/config/options.lua:2`), so `lua/config/options.lua` is byte-identical to the starter and carries no local lines at all. It used to set `,`, which shadowed vim's built-in `,` (repeat last `f`/`t` backwards); that was changed on 2026-09-01, and the explicit assignment was dropped rather than left restating upstream. `<Space>` shadows only the one-char-right motion, which `l` already does. `invariants.bats` no longer checks `options.lua`, because there is nothing there that upstream could revert.
+
+If you ever need a leader *other* than `<Space>`, `lua/config/options.lua` is still the right place — the ordering is what makes it work. LazyVim's `M.load()` (`lua/lazyvim/config/init.lua:295`, comment: *"always load lazyvim, then user file"*) sources `lazyvim.config.options` and *then* the user's `config.options`, so a value set there wins; and that same `M.load("options")` runs before lazy.nvim sources any plugin spec, which is the condition mapleader has to meet, since plugins resolve `<leader>` in their `keys` at map time. Re-add the invariant if you do, since the failure is silent.
+
+Note vim's *own* leader in `dot_vimrc:169` is still `,`, and README's `,ev`/`,sv` are vim's mappings — the two editors are unrelated here. `maplocalleader` is left at LazyVim's `\`.
 
 **`lua/plugins/example.lua` must stay**, even though every line in it is commented out: `lua/config/lazy.lua` does `{ import = "plugins" }`, and an empty `lua/plugins/` makes lazy.nvim complain on every startup.
 
