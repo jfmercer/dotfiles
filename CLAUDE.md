@@ -78,19 +78,43 @@ bump-deps --apply -y   # ... unattended; skip the per-external prompt
 bump-deps --self-test  # prove the in-place editing is surgical
 ```
 
-**A pin is not always a version.** The tool treats four classes differently, and conflating them would be harmful:
+**A pin is not always a version.** The tool treats five classes differently, and conflating them would be harmful:
 
 | Class | Where | Bumping means |
 |-------|-------|---------------|
-| `VERSION` | `install.sh`, `ci.yaml`, linux installs | Latest stable release. Automatic. |
+| `VERSION` | `install.sh`, `ci.yaml`, linux installs | Latest stable release. Automatic. A pin may carry `hashes` — checksums whose URL embeds the version, so they are *derived*, not independent. Those are recomputed and rewritten in the same operation as the version, for the reason `ACTION` moves its comment with its SHA. `rustup` is the only one today. A pin may also carry `latest_url` for an upstream that publishes no GitHub Releases. |
 | `ACTION` | `ci.yaml`, `deps.yaml` | A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment. Resolves the latest release's tag to its commit and rewrites **both halves together**. Automatic. |
 | `EXTERNAL` | `.chezmoiexternal.yaml` (14) | Move to master HEAD, recompute checksum. Confirmed per entry, because it pulls upstream code nobody has read — `-y` (aka `--yes`, `--externals-all`) waives that prompt for the whole run. |
-| `CONTENT` | `RUSTUP_INIT_SHA256` | A hash over an *unversioned* URL. A change means upstream rewrote the installer — a trust decision, so it needs `--accept rustup`. |
+| `CONTENT` | *(registry empty)* | A hash over an *unversioned* URL. A change means upstream rewrote the file — a trust decision, so it is reported and needs `--accept <name>`. `rustup` was the only member and has moved to `VERSION`; see below. The class is kept because the shape recurs and is currently *unpinned* in two places: `install.sh` curls `get.chezmoi.io`, and the Homebrew bootstrap curls a `HEAD` URL. |
 | `ANCHOR` | `EZA_KEY_FPR`, `CHARM_KEY_FPR` | A GPG public-key fingerprint. **Never rewritten automatically.** A mismatch is key rotation or an attack; verify against upstream's own announcement and edit by hand. `CHARM_KEY_FPR` (Charm's apt repo, for glow) carries an expiry of 2027-07-13, so it *will* rotate on schedule — unlike eza's. |
 
 It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and Actions **not** pinned to a commit SHA with a matching version comment.
 
+It likewise requires that **every `*_SHA256*` in the linux installs script is registered as a `hashes` entry, and vice versa** — the same check as the fingerprint one below, in both directions, because these are derived values that never fail noisily on their own. An unregistered checksum is simply never recomputed, so the next bump moves `RUSTUP_VERSION` and leaves it describing the *previous* release: a tree that reports `current` and cannot install. A registered one with no counterpart in the script makes `--apply` abort after the version line has already been rewritten, leaving the tree half-bumped.
+
 It also requires that **every `*_KEY_FPR` in the linux installs script is registered in `ANCHOR_PINS`**. The fingerprint in the script only blocks a bad key at install time; it is the `ANCHOR_PINS` entry that makes `deps.yaml` fetch the live key weekly and report a rotation. Those live in two files, so before this check an unregistered pin was simply never watched — while the report went on listing every anchor it *did* know as `current`. Precisely the `deps.yaml` failure below, one pin class over: a staleness detector certifying something it had never read.
+
+#### Why rustup is pinned by version, and why the installer script is not used
+
+The documented way to install rustup is `curl https://sh.rustup.rs | sh`. This repo does not use that script at all, and the reasons are worth keeping, because "just use upstream's installer" is the obvious thing to revert to.
+
+It used to. `RUSTUP_INIT_SHA256` was a `CONTENT` pin over `sh.rustup.rs`, and it failed twice over:
+
+- **It broke CI on upstream's schedule.** The script embeds its own version banner, so *every* rustup release changes its hash. That is not a bump anyone chose; it is a red `master` arriving unannounced. And a `CHANGED` `CONTENT` pin routes to the tracking issue rather than the auto-PR by design, so the weekly job could not pre-empt it — the breakage window was up to six days.
+- **It was securing the wrong thing.** `rustup-init.sh` performs *no* integrity check on the binary it downloads: the only `SHA256` in its ~930 lines is a TLS cipher list. It fetches `rustup-init` from the floating `dist/` path and executes it on TLS trust alone. So the pin scrutinized the 930-line wrapper while the payload — the part that actually runs — was unpinned and floating.
+
+There is no versioned URL for the *script* (`archive/<version>/rustup-init.sh` is a 404), so this could not be fixed by re-pointing the pin. What upstream does publish is the **binary** under an immutable `archive/<version>/<target>/rustup-init`. The install script now resolves the host triple itself, fetches that, and verifies it against a hash pinned beside the version.
+
+The arch mapping we own is short — `x86_64`/`aarch64`, hard failure otherwise — because this script is Debian-only, and the bulk of upstream's `get_architecture()` covers Darwin/Rosetta, Android, Windows, illumos/Solaris, the BSDs, musl and the 32-bit and big-endian targets, none of which can occur here. Do not "restore" the rest of it.
+
+One piece of it *is* kept, because `uname -m` alone cannot see it: a **64-bit kernel running a 32-bit userland** still reports `x86_64` or `aarch64`, and the 64-bit binary would die with a bare `Exec format error`. Upstream reads the ELF header of `/proc/self/exe`; `getconf LONG_BIT` answers the same question in one line and comes from `libc-bin`, which is Essential. Only 64-bit builds are pinned here, so that check refuses rather than falling back to `i686`/`armv7` as upstream does.
+
+Two details that look like arbitrary choices and are not:
+
+- **`bump-deps` computes the hashes from the bytes it downloads, not from upstream's `rustup-init.sha256` sidecar.** The sidecar is a claim served by the same host as the binary, so trusting it would restate the download rather than check it. (They do currently agree; that was verified when this landed.)
+- **The version comes from upstream's `release-stable.toml`, not from `gh`.** `rust-lang/rustup` publishes tags but cuts no GitHub Releases, so `gh api .../releases/latest` returns 404. A test asserts this path never routes back through `latest_release()`.
+
+A checksum mismatch now means something different, and the script's error message says so: `archive/<version>/` is immutable, so it should never drift on its own. Treat a mismatch as a supply-chain problem, not a stale pin.
 
 #### The weekly job — `.github/workflows/deps.yaml`
 

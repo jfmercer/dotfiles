@@ -10,7 +10,11 @@ treating them uniformly would be actively harmful -- auto-updating a GPG key
 fingerprint, for instance, would defeat the entire reason it is pinned.
 
   VERSION  A release tag. Resolve the latest stable release and rewrite it.
-           Fully automatic.
+           Fully automatic. A pin may declare `hashes`: checksums that are a
+           pure function of the version, because the URL they cover embeds it.
+           Those are not separate pins -- they are derived, so they are
+           recomputed and rewritten in the same operation as the version, for
+           the reason ACTION moves its comment with its SHA.
   ACTION   A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment
            beside it. Both halves move together: the SHA is what actually runs,
            the comment is what a human reads, and a comment that disagrees with
@@ -21,7 +25,12 @@ fingerprint, for instance, would defeat the entire reason it is pinned.
            individually, with a compare URL.
   CONTENT  A sha256 over an *unversioned* URL. There is no version to compare;
            a change means upstream rewrote the file. That is a trust decision,
-           so it is reported and requires --accept.
+           so it is reported and requires --accept. The registry is currently
+           empty: rustup was the only member and moved to VERSION once it turned
+           out upstream publishes an immutable archive/<version>/ path. The
+           class is kept because the shape recurs -- install.sh still curls
+           get.chezmoi.io, and the Homebrew bootstrap still curls a HEAD URL,
+           neither of which is pinned at all today.
   ANCHOR   A security anchor (a GPG public key fingerprint). NEVER rewritten. A
            mismatch is either key rotation, which you verify out of band against
            the project's own announcement, or an attack.
@@ -68,6 +77,11 @@ VERSION_FLOOR = ".chezmoiversion"
 #   occurrences how many times the pattern is expected in the file. A mismatch
 #              aborts rather than silently editing the wrong number of lines.
 #   strip_v    upstream tags are vX.Y.Z but this pin stores X.Y.Z.
+#   latest_url where to read the current stable version, for projects that do
+#              not cut GitHub Releases (rust-lang/rustup only tags, so
+#              `gh api .../releases/latest` 404s). Paired with latest_pattern.
+#   hashes     checksums derived from the version, rewritten with it. See the
+#              rustup entry for why these are not pins in their own right.
 # --------------------------------------------------------------------------
 VERSION_PINS = [
     {
@@ -136,6 +150,47 @@ VERSION_PINS = [
         "occurrences": 1,
         "strip_v": True,
     },
+    {
+        # Was a CONTENT pin -- a hash over https://sh.rustup.rs, which is
+        # unversioned. That broke CI on upstream's release schedule (the script
+        # embeds its own version banner, so every release changes the hash) and
+        # could not be bumped unattended, since a CHANGED content pin is routed
+        # to the tracking issue by design. Worse, it was securing the wrong
+        # thing: rustup-init.sh does no integrity check on the binary it
+        # downloads, and pulls it from the floating dist/ path, so the payload
+        # was unpinned while the wrapper was scrutinized.
+        #
+        # The install script now fetches the binary from the immutable
+        # archive/<version>/ path directly, which makes this a plain version
+        # pin. The two hashes are the binaries at that version -- derived, not
+        # independent -- so apply_versions() recomputes them from the new
+        # version's URLs and rewrites all three together. Registering a third
+        # architecture means adding it here *and* to the case statement in
+        # LINUX; the invariant below fails if the two disagree.
+        #
+        # rustup publishes no GitHub Releases, only tags, so the stable version
+        # comes from upstream's own release-stable.toml rather than from gh.
+        "name": "rustup",
+        "file": LINUX,
+        "pattern": r'RUSTUP_VERSION="([^"]+)"',
+        "repo": "rust-lang/rustup",
+        "latest_url": "https://static.rust-lang.org/rustup/release-stable.toml",
+        "latest_pattern": r"^version\s*=\s*'([^']+)'",
+        "occurrences": 1,
+        "strip_v": False,
+        "hashes": [
+            {
+                "pattern": r'RUSTUP_INIT_SHA256_X86_64="([0-9a-f]{64})"',
+                "url": "https://static.rust-lang.org/rustup/archive/{version}"
+                "/x86_64-unknown-linux-gnu/rustup-init",
+            },
+            {
+                "pattern": r'RUSTUP_INIT_SHA256_AARCH64="([0-9a-f]{64})"',
+                "url": "https://static.rust-lang.org/rustup/archive/{version}"
+                "/aarch64-unknown-linux-gnu/rustup-init",
+            },
+        ],
+    },
 ]
 
 # --------------------------------------------------------------------------
@@ -172,16 +227,10 @@ ACTION_PINS = [
     },
 ]
 
-CONTENT_PINS = [
-    {
-        "name": "rustup",
-        "file": LINUX,
-        "pattern": r'RUSTUP_INIT_SHA256="([0-9a-f]{64})"',
-        "url": "https://sh.rustup.rs",
-        "occurrences": 1,
-        "note": "installer script at an unversioned URL",
-    },
-]
+# Empty by design, not by neglect -- see the class note in the module docstring.
+# The machinery and --accept stay: get.chezmoi.io and Homebrew's HEAD installer
+# are the same shape and are currently pinned by nothing at all.
+CONTENT_PINS: list[dict] = []
 
 ANCHOR_PINS = [
     {
@@ -295,6 +344,47 @@ def sha256_of_url(url: str) -> str:
         for chunk in iter(lambda: resp.read(1 << 16), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def scrape_url(url: str, pattern: str) -> str:
+    """Pull one capture group out of a small text document at a fixed https URL.
+
+    For upstreams that publish a stable version somewhere other than a GitHub
+    Release. Kept separate from sha256_of_url so the report tests can stub the
+    two independently -- and so both are stubbed, since a test that reaches the
+    network passes or fails on someone else's uptime.
+    """
+    with urllib.request.urlopen(url) as resp:  # noqa: S310 - fixed https hosts
+        text = resp.read().decode()
+    m = re.search(pattern, text, re.M)
+    if not m:
+        raise Problem(f"no match for {pattern!r} at {url}")
+    return m.group(1)
+
+
+def latest_version(pin: dict) -> str:
+    """The upstream version for a VERSION pin, from wherever it publishes one."""
+    if pin.get("latest_url"):
+        return scrape_url(pin["latest_url"], pin["latest_pattern"])
+    tag = latest_release(pin["repo"])
+    return tag.lstrip("v") if pin["strip_v"] else tag
+
+
+def companion_pin(pin: dict, hash_spec: dict) -> dict:
+    """Adapt a `hashes` entry into something current_value/replace_value accept.
+
+    They take a pin-shaped dict; a companion carries only its own pattern and
+    otherwise inherits the parent's file and name.
+    """
+    return {
+        # Named for the variable it rewrites, not just the parent pin: a pin can
+        # carry several, and "rustup hash" twice in a self-test report tells you
+        # nothing about which architecture failed.
+        "name": hash_spec["pattern"].split('="', 1)[0],
+        "file": pin["file"],
+        "pattern": hash_spec["pattern"],
+        "occurrences": 1,
+    }
 
 
 def gpg_fingerprint(url: str) -> str:
@@ -545,6 +635,32 @@ def check_invariants() -> list[str]:
                 "no weekly check ever fetches that key -- a rotation (or a "
                 "substituted key) would surface only when a fresh install fails"
             )
+
+    # 5. The install script's checksums and the `hashes` registry must describe
+    #    the same set, in both directions. These are derived values that only
+    #    ever change as a side effect of a version bump, so neither half fails
+    #    noisily on its own: an unregistered checksum is simply never recomputed
+    #    and pins an old binary under a new version, and a registered one with
+    #    no counterpart in the script makes --apply abort mid-rewrite, after the
+    #    version line has already been changed. Same shape as the check above --
+    #    two files, nothing else comparing them.
+    declared = {
+        spec["pattern"].split('="', 1)[0]
+        for p in VERSION_PINS
+        for spec in p.get("hashes", [])
+    }
+    in_script = set(re.findall(r"^([A-Z][A-Z0-9_]*_SHA256[A-Z0-9_]*)=", text, re.M))
+    for name in sorted(in_script - declared):
+        problems.append(
+            f"{LINUX}: {name} is not registered as a `hashes` entry in bump-deps, "
+            "so a version bump would rewrite the version and leave this checksum "
+            "describing the previous release"
+        )
+    for name in sorted(declared - in_script):
+        problems.append(
+            f"bump-deps registers a `hashes` entry for {name}, which {LINUX} does "
+            "not define -- --apply would abort partway through the rewrite"
+        )
     return problems
 
 
@@ -568,8 +684,7 @@ def gather(only: set[str]) -> list[Row]:
         if only and pin["name"] not in only:
             continue
         cur = current_value(pin)
-        tag = latest_release(pin["repo"])
-        latest = tag.lstrip("v") if pin["strip_v"] else tag
+        latest = latest_version(pin)
         rows.append(
             Row(pin["name"], "VERSION", cur, latest, "current" if cur == latest else "stale")
         )
@@ -689,6 +804,19 @@ def apply_versions(rows: list[Row], dry: bool) -> int:
         if not dry:
             n = replace_value(pin, row.current, row.latest)
             print(f"    {pin['file']} ({n} occurrence(s))")
+            # Derived hashes move with the version, in the same run. Computed
+            # from the bytes actually served at the new version's URL rather
+            # than read from upstream's .sha256 sidecar: the sidecar is a claim
+            # from the same host, so it would restate the download rather than
+            # check it. Leaving these behind would pin a version whose hashes
+            # describe the previous one -- a tree that reports "current" and
+            # fails at install time, which is the ACTION comment-rot failure in
+            # a form that actually stops a machine building.
+            for spec in pin.get("hashes", []):
+                sub = companion_pin(pin, spec)
+                digest = sha256_of_url(spec["url"].format(version=row.latest))
+                replace_value(sub, current_value(sub), digest)
+                print(f"    {sub['pattern'].split('=', 1)[0]} -> {digest[:12]}...")
         changed += 1
     return changed
 
@@ -819,7 +947,16 @@ def self_test_actions() -> int:
 
 def self_test() -> int:
     """Prove replace_value touches only the capture group, then restore."""
-    targets = VERSION_PINS + CONTENT_PINS
+    # Companion hashes are rewritten through the same single-group path, so they
+    # get the same proof. It is worth having: they sit in the same file as the
+    # version that drives them, and several share a name prefix, which is the
+    # setup where a pattern that is loose by one character rewrites its
+    # neighbour and the tree still looks plausible.
+    targets = (
+        VERSION_PINS
+        + CONTENT_PINS
+        + [companion_pin(p, spec) for p in VERSION_PINS for spec in p.get("hashes", [])]
+    )
     failures = 0
     backups: dict[str, str] = {}
     for pin in {p["file"]: p for p in targets}:

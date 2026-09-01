@@ -12,6 +12,8 @@ here requires `gh` to be installed or authenticated.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import unittest
 
@@ -21,6 +23,9 @@ from helper import (
     GITLEAKS_SHA,
     LINUX_TMPL,
     REPO_ROOT,
+    RUSTUP_ARM_SHA,
+    RUSTUP_VERSION_PIN,
+    RUSTUP_X86_SHA,
     SINGLE_GROUP_REGISTRIES,
     bump_deps,
     fixture_repo,
@@ -29,6 +34,8 @@ from helper import (
 )
 
 Problem = bump_deps.Problem
+
+LINUX = ".chezmoiscripts/linux/run_onchange_before_10_installs.sh.tmpl"
 
 # What the fixture workflows pin, so "upstream has not moved" is the default and a
 # test wanting drift has to say so.
@@ -404,6 +411,44 @@ class CheckInvariants(unittest.TestCase):
             problems = bump_deps.check_invariants()
         self.assertEqual([p for p in problems if "ANCHOR_PINS" in p], [])
 
+    def test_an_unregistered_checksum_in_the_script_is_caught(self):
+        # Adding an architecture to the install script without registering its
+        # hash in bump-deps. Nothing fails at the time: the pin still resolves,
+        # the report still says "current". It goes wrong one release later, when
+        # --apply moves RUSTUP_VERSION and leaves this checksum describing the
+        # previous binary -- a tree that looks bumped and cannot install.
+        extra = LINUX_TMPL.replace(
+            "EZA_KEY_FPR=",
+            f'RUSTUP_INIT_SHA256_RISCV64="{"c" * 64}"\nEZA_KEY_FPR=',
+        )
+        with fixture_repo(**{LINUX: extra}):
+            problems = bump_deps.check_invariants()
+        self.assertTrue(
+            any("RUSTUP_INIT_SHA256_RISCV64" in p and "`hashes`" in p for p in problems),
+            problems,
+        )
+
+    def test_a_registered_checksum_missing_from_the_script_is_caught(self):
+        # The other direction: registered in bump-deps, absent from the script.
+        # --apply would rewrite the version line and then abort on the missing
+        # pattern, leaving the tree half-bumped.
+        without = LINUX_TMPL.replace(
+            f'RUSTUP_INIT_SHA256_AARCH64="{RUSTUP_ARM_SHA}"\n', ""
+        )
+        with fixture_repo(**{LINUX: without}):
+            problems = bump_deps.check_invariants()
+        self.assertTrue(
+            any("RUSTUP_INIT_SHA256_AARCH64" in p and "does not define" in p for p in problems),
+            problems,
+        )
+
+    def test_a_matching_set_of_checksums_is_not_flagged(self):
+        # As with the fingerprint test above: prove the check can pass, so it
+        # cannot degenerate into "any checksum is a problem".
+        with fixture_repo():
+            problems = bump_deps.check_invariants()
+        self.assertEqual([p for p in problems if "`hashes`" in p], [])
+
 
 class ReplaceActionPin(unittest.TestCase):
     """Rewriting an ACTION pin: both halves, every file, nothing else."""
@@ -463,22 +508,30 @@ class Report(unittest.TestCase):
         # Nothing may touch the network. Each test overrides what it needs.
         self._saved = {
             name: getattr(bump_deps, name)
-            for name in ("gh_text", "sha256_of_url", "gpg_fingerprint")
+            for name in ("gh_text", "sha256_of_url", "gpg_fingerprint", "scrape_url")
         }
         bump_deps.gh_text = lambda *a, **k: self.fail("unexpected gh api call")
         bump_deps.sha256_of_url = lambda url: "0" * 64
         bump_deps.gpg_fingerprint = lambda url: "A" * 40
+        # rustup reads its version from upstream's release-stable.toml rather
+        # than from a GitHub Release, so it needs its own stub or gather() would
+        # reach the network on any test that does not restrict itself by name.
+        bump_deps.scrape_url = lambda url, pattern: self.fail("unexpected urlopen")
 
     def tearDown(self):
         for name, fn in self._saved.items():
             setattr(bump_deps, name, fn)
 
-    def _stub_github(self, latest=None, head=None, tag=None, ahead=0, commits=None):
+    def _stub_github(self, latest=None, head=None, tag=None, ahead=0, commits=None, stable=None):
         """Default to "upstream is exactly what the fixture pins", so a test only
         has to describe the one thing it wants to be different."""
         latest = latest or {}
         commits = commits or {}
         bump_deps.latest_release = lambda repo: latest.get(repo, current_tag(repo))
+        # `stable` is the release-stable.toml route, used by pins whose upstream
+        # publishes no GitHub Releases. Defaults to the fixture's own version for
+        # the same reason as everything else here.
+        bump_deps.scrape_url = lambda url, pattern: stable or RUSTUP_VERSION_PIN
         bump_deps.head_sha = lambda repo: head or FIXTURE_HEADS[repo]
         bump_deps.nearest_tag = lambda repo: tag if tag is not None else "0.14.0"
         bump_deps.ahead_by = lambda repo, sha: ahead
@@ -565,12 +618,93 @@ class Report(unittest.TestCase):
     def test_a_changed_content_pin_is_CHANGED_not_stale(self):
         # deps.yaml greps for '^CHANGED:' to escalate the issue title, because a
         # rewritten unversioned installer is a trust decision, not an update.
+        #
+        # CONTENT_PINS is empty now that rustup is pinned by version, so this
+        # registers a throwaway pin instead of asserting on a real one. Worth
+        # keeping rather than deleting with its last member: the machinery is
+        # still reachable via --accept, deps.yaml still routes '^CHANGED:', and
+        # a class that only breaks once someone registers a pin in it is a class
+        # nobody can register a pin in safely.
+        demo = {
+            "name": "demo-installer",
+            "file": LINUX,
+            "pattern": r'DEMO_INSTALLER_SHA256="([0-9a-f]{64})"',
+            "url": "https://example.invalid/install.sh",
+            "occurrences": 1,
+            "note": "installer script at an unversioned URL",
+        }
+        fixture = LINUX_TMPL.replace(
+            "{{- end -}}", f'DEMO_INSTALLER_SHA256="{"0" * 64}"\n{{{{- end -}}}}'
+        )
         self._stub_github()
         bump_deps.sha256_of_url = lambda url: "f" * 64
-        with fixture_repo():
-            rows = bump_deps.gather({"rustup"})
+        bump_deps.CONTENT_PINS.append(demo)
+        try:
+            with fixture_repo(**{LINUX: fixture}):
+                rows = bump_deps.gather({"demo-installer"})
+        finally:
+            bump_deps.CONTENT_PINS.remove(demo)
+        self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].klass, "CONTENT")
         self.assertEqual(rows[0].status, "CHANGED")
+
+    def test_rustup_resolves_its_version_without_calling_gh(self):
+        # rust-lang/rustup publishes tags but no GitHub Releases, so
+        # `gh api .../releases/latest` 404s. The version comes from upstream's
+        # release-stable.toml instead. gh_text is stubbed to fail the test, so
+        # a regression that routes this back through latest_release() is caught
+        # here rather than as a 404 in the Monday job.
+        self._stub_github(stable="1.99.0")
+        with fixture_repo():
+            rows = bump_deps.gather({"rustup"})
+        self.assertEqual(rows[0].klass, "VERSION")
+        self.assertEqual(rows[0].current, RUSTUP_VERSION_PIN)
+        self.assertEqual(rows[0].latest, "1.99.0")
+        self.assertEqual(rows[0].status, "stale")
+
+    def test_bumping_rustup_rewrites_its_derived_hashes_too(self):
+        # The point of moving rustup off CONTENT: the version and the two
+        # per-architecture checksums are one pin, not three. A bump that moved
+        # the version alone would leave the tree reporting "current" while
+        # pinning last release's binaries under this release's URL -- and it
+        # would fail at install time, not at check time.
+        digests = {
+            "x86_64-unknown-linux-gnu": "a" * 64,
+            "aarch64-unknown-linux-gnu": "b" * 64,
+        }
+
+        def fake_sha256(url):
+            self.assertIn("/archive/1.99.0/", url)
+            return next(d for t, d in digests.items() if t in url)
+
+        self._stub_github(stable="1.99.0")
+        with fixture_repo() as repo:
+            rows = bump_deps.gather({"rustup"})
+            bump_deps.sha256_of_url = fake_sha256
+            with contextlib.redirect_stdout(io.StringIO()):
+                changed = bump_deps.apply_versions(rows, dry=False)
+            after = read(repo, LINUX)
+        self.assertEqual(changed, 1)
+        self.assertIn('RUSTUP_VERSION="1.99.0"', after)
+        self.assertIn(f'RUSTUP_INIT_SHA256_X86_64="{"a" * 64}"', after)
+        self.assertIn(f'RUSTUP_INIT_SHA256_AARCH64="{"b" * 64}"', after)
+        # The old values are gone, not merely joined by the new ones.
+        self.assertNotIn(RUSTUP_X86_SHA, after)
+        self.assertNotIn(RUSTUP_ARM_SHA, after)
+
+    def test_a_current_rustup_leaves_its_hashes_alone(self):
+        # apply_versions() skips pins that are not actionable, so an unchanged
+        # version must not trigger two pointless ~15MB downloads on every run of
+        # the weekly job -- and must not rewrite anything.
+        self._stub_github()
+        bump_deps.sha256_of_url = lambda url: self.fail("downloaded on a no-op bump")
+        with fixture_repo() as repo:
+            rows = bump_deps.gather({"rustup"})
+            with contextlib.redirect_stdout(io.StringIO()):
+                changed = bump_deps.apply_versions(rows, dry=False)
+            after = read(repo, LINUX)
+        self.assertEqual(changed, 0)
+        self.assertEqual(after, LINUX_TMPL)
 
     def test_a_rotated_anchor_is_ROTATED_and_never_auto_bumped(self):
         self._stub_github()
