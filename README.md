@@ -39,7 +39,7 @@ The `curl | bash` one-liner above executes code fetched over the network before 
 - `get.chezmoi.io` to serve an honest chezmoi installer — the version it installs is pinned in `install.sh`, so a compromised endpoint cannot silently substitute a different chezmoi, but the installer script itself is unpinned,
 - Homebrew's `install.sh` from `HEAD` (macOS only).
 
-Everything downstream of that *is* pinned and verified: all `.chezmoiexternal.yaml` entries carry a `checksum.sha256`, and the Linux install script verifies rustup's installer checksum, lazygit's release checksum, and the eza signing key's fingerprint before using any of them.
+Everything downstream of that *is* pinned and verified: all `.chezmoiexternal.yaml` entries carry a `checksum.sha256`, and the Linux install script verifies `rustup-init`'s checksum, lazygit's release checksum, and the eza signing key's fingerprint before using any of them. rustup is pinned by version and fetched from its immutable `archive/<version>/` path rather than through `sh.rustup.rs`, which is unversioned and does not itself verify the binary it downloads.
 
 If that residual trust is not acceptable, clone the repo over SSH and run `./install.sh` directly instead of piping anything into a shell.
 

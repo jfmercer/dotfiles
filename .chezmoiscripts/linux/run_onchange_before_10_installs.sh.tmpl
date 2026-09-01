@@ -136,7 +136,12 @@ EZA_KEY_FPR="1548BC8A4B4D2688F9B0DAF7EC29E2090CE3FD43" # gitleaks:allow
 # it lapses upstream will publish a new one and the check below will fail loudly
 # -- that is a rotation to verify by hand, not a bug to work around.
 CHARM_KEY_FPR="ED927B38BE981E53CA09153D03BBF595D4DFD35C" # gitleaks:allow
-RUSTUP_INIT_SHA256="7d0ea0f8eba7fa1ebfe998091cd7ec4501e33ec5ca6b884eb4d894d7da5170af"
+# rustup, pinned by version rather than by a hash over an unversioned URL. The
+# two hashes below are a pure function of this version -- they are the binaries
+# under archive/${RUSTUP_VERSION}/ -- so all three move together or not at all.
+RUSTUP_VERSION="1.29.1"
+RUSTUP_INIT_SHA256_X86_64="dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+RUSTUP_INIT_SHA256_AARCH64="15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433"
 LAZYGIT_VERSION="0.64.1"
 
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
@@ -209,22 +214,83 @@ sudo apt install -y glow
 ### RUST INSTALLS
 
 # noninteractive rust install (needed for delta)
-# Download-then-verify rather than curl | sh, so a tampered installer cannot
-# execute before we have looked at it.
-# Bump (Linux): curl -fsSL https://sh.rustup.rs | sha256sum
-#       (macOS): curl -fsSL https://sh.rustup.rs | shasum -a 256
+#
+# Upstream's documented route is `curl https://sh.rustup.rs | sh`, and we
+# deliberately do not use that script at all. Two reasons, both from reading it:
+#
+#   - It is served from an *unversioned* URL, so the only thing there is to pin
+#     is a hash over whatever it happens to serve today. Upstream rewrites it on
+#     every release (the version banner alone changes), so that pin breaks the
+#     build on their release schedule rather than on our upgrades, and it cannot
+#     be bumped unattended because a changed hash is indistinguishable from a
+#     tampered one.
+#   - It performs no integrity check at all on the binary it downloads. The only
+#     SHA256 in its ~930 lines is a TLS cipher list. It fetches rustup-init from
+#     the floating `dist/` path and executes it on TLS trust alone -- so pinning
+#     the script's hash secured the wrapper while leaving the payload, the part
+#     that actually runs, entirely unpinned.
+#
+# So we do what that script does, minus what we do not need: resolve the host
+# triple, fetch that binary from the immutable archive/<version>/ path, verify
+# it against the hash pinned above, and run it. The arch mapping is short
+# because this script is Debian-only: most of upstream's get_architecture()
+# covers Darwin/Rosetta, Android, Windows, illumos/Solaris, the BSDs, musl and
+# the 32-bit and big-endian targets, none of which occur here. Anything not
+# listed below is a hard failure rather than a guess.
+#
+# Bump: bin/bump-deps --apply, which moves RUSTUP_VERSION and both hashes as one
+# operation. Never edit one without the others.
+
+# The one Linux case upstream handles that `uname -m` alone cannot: a 64-bit
+# kernel running a 32-bit userland still reports x86_64 or aarch64, and the
+# 64-bit binary would then die with a bare "Exec format error". Upstream reads
+# the ELF header of /proc/self/exe to detect it; getconf reports the same thing
+# in one line, and comes from libc-bin, which is Essential. Only 64-bit builds
+# are pinned here, so this is a refusal rather than a fallback to i686/armv7.
+if [ "$(getconf LONG_BIT)" != "64" ]; then
+    echo "32-bit userland on $(uname -m): only 64-bit rustup builds are pinned here." >&2
+    exit 1
+fi
+
+case "$(uname -m)" in
+    x86_64 | amd64)
+        rustup_target="x86_64-unknown-linux-gnu"
+        rustup_sha256="$RUSTUP_INIT_SHA256_X86_64"
+        ;;
+    aarch64 | arm64)
+        rustup_target="aarch64-unknown-linux-gnu"
+        rustup_sha256="$RUSTUP_INIT_SHA256_AARCH64"
+        ;;
+    *)
+        echo "unsupported architecture for rustup: $(uname -m)" >&2
+        echo "Add its triple and pinned hash here and in bin/bump-deps." >&2
+        exit 1
+        ;;
+esac
+
+rustup_init=$(mktemp)
+curl --proto '=https' --tlsv1.2 -sSf \
+    "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rustup_target}/rustup-init" \
+    -o "$rustup_init"
 # NB: sha256sum, not shasum -- this script is Debian-only and sha256sum comes
 # from coreutils (Essential), whereas shasum ships in the non-Essential `perl`
 # package and can be missing on a minimal install.
-rustup_init=$(mktemp)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$rustup_init"
-echo "${RUSTUP_INIT_SHA256}  ${rustup_init}" | sha256sum -c - || {
-    echo "rustup-init.sh checksum mismatch -- refusing to run it." >&2
-    echo "If upstream legitimately changed it, recompute and bump RUSTUP_INIT_SHA256." >&2
+echo "${rustup_sha256}  ${rustup_init}" | sha256sum -c - || {
+    echo "rustup-init checksum mismatch -- refusing to run it." >&2
+    echo "archive/${RUSTUP_VERSION}/ is immutable, so this should never drift on" >&2
+    echo "its own: treat a mismatch as a supply-chain problem, not a stale pin." >&2
     rm -f "$rustup_init"
     exit 1
 }
-sh "$rustup_init" -y
+chmod u+x "$rustup_init"
+# mktemp honors TMPDIR, which can be mounted noexec; upstream's script hits the
+# same wall and says so rather than failing as a bare "permission denied".
+if [ ! -x "$rustup_init" ]; then
+    echo "cannot execute $rustup_init (is TMPDIR mounted noexec?)" >&2
+    rm -f "$rustup_init"
+    exit 1
+fi
+"$rustup_init" -y
 rm -f "$rustup_init"
 # shellcheck source=/dev/null
 source "$HOME/.cargo/env"
