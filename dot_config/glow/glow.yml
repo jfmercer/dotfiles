@@ -25,5 +25,29 @@ mouse: true
 # and redirected runs too. It is benign in practice: $PAGER (or glow's `less -r`
 # fallback) sees a non-TTY stdout and passes the text straight through.
 pager: true
-# word-wrap at width
-width: 100
+# word-wrap at width -- 0 means "detect the terminal".
+#
+# glamour never reflows a paragraph. A soft line break in the source survives
+# verbatim into the output, and `width` only re-wraps each *source* line that is
+# too long. So a width narrower than the file's own hard wrap does not re-fill
+# the paragraph, it sheds the last word or two of every line onto a line of its
+# own -- a ragged column of "and,", "is", "cannot" down the left margin. This
+# was set to 100, which is exactly the width most Markdown gets hard-wrapped
+# at, and glamour's margins cost 4 columns, turning that into 96 usable: every
+# single line overflowed by a word.
+#
+# This narrows the problem, it does not remove it. The render field is
+# `width - 4` and detection is capped at 120, so a file hard-wrapped at 103
+# still stubs on a 104-column terminal, and one wrapped past ~116 stubs on any
+# terminal. glow has no reflow option to reach for -- `--preserve-new-lines`
+# does not affect softbreaks in either direction. The actual fix is upstream of
+# glow: do not hard-wrap paragraphs when writing Markdown.
+#
+# 0 is not "no wrapping" here. glow only disables wrapping when the *flag* was
+# given (main.go: `if !cmd.Flags().Changed("width")`), so `glow -w 0` renders a
+# 270-column table straight past the terminal edge. Coming from this file the
+# flag is unchanged, so 0 takes the detection branch instead: terminal width,
+# capped at 120, falling back to 80 when stdout is not a TTY. That is wider
+# than anything hard-wrapped at 100, so paragraphs come out as their author
+# wrapped them, while tables are still fitted to the terminal.
+width: 0
