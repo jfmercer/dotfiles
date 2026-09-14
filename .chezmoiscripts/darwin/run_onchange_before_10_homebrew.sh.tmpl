@@ -19,6 +19,12 @@ unset brew_bin
 # shell would do -- casks into ~/Applications, and checksums enforced.
 export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
 
+# `brew bundle` below downloads a bottle per formula and a disk image per cask,
+# all through Homebrew's own curl, which does not retry by default. Not mirrored
+# into homebrew/exports.zsh: this is about surviving an unattended apply, not
+# about matching interactive behavior.
+export HOMEBREW_CURL_RETRIES=3
+
 {{ $brews := list
      "asdf"
      "atuin"

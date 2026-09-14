@@ -404,3 +404,73 @@ load helpers/stub.bash
         return 1
     fi
 }
+
+# ------------------------------------------------------- network retry policy
+
+# Joins backslash continuations into logical lines and drops whole-line
+# comments, so a multi-line invocation is judged as one command and a `curl`
+# mentioned in prose is not judged at all.
+_logical_lines() {
+    awk '
+        /^[[:space:]]*#/ { next }
+        {
+            cont = ($0 ~ /\\$/)
+            line = $0
+            sub(/\\$/, "", line)
+            buf = buf line
+            if (cont) next
+            print buf
+            buf = ""
+        }
+        END { if (buf != "") print buf }
+    ' "$1"
+}
+
+# Every file that fetches something over the network during CI, a bootstrap or
+# an apply. Derived from globs so a new workflow or script is covered rather
+# than silently exempt.
+_networked_files() {
+    local f
+    for f in "$REPO_ROOT/install.sh" "$REPO_ROOT"/scripts/*.sh \
+             "$REPO_ROOT"/.github/workflows/*.yaml; do
+        if [ -f "$f" ]; then
+            echo "$f"
+        fi
+    done
+    find "$REPO_ROOT/.chezmoiscripts" -name '*.tmpl'
+}
+
+@test "every curl and wget invocation asks for retries" {
+    # A single apply job makes ~300 network requests (208 crates, 74 apt fetches,
+    # plus rustup/lazygit/chezmoi and its 14 externals). With no retries the job
+    # failed far more often than any one request did, and the weekly dependency
+    # PR nearly always needed a manual re-run -- every recorded failure an HTTP
+    # 503/504 or a dropped connection, never a checksum mismatch.
+    #
+    # This is the kind of thing that rots back out silently: dropping the flags
+    # breaks nothing until the next transient outage, which is precisely when
+    # nobody wants to be re-reading this file.
+    local file line offenders=""
+    while IFS= read -r file; do
+        while IFS= read -r line; do
+            case "$line" in
+                *--retry*) continue ;;
+            esac
+            offenders="${offenders}
+  ${file#"$REPO_ROOT"/}: ${line#"${line%%[![:space:]]*}"}"
+        done < <(_logical_lines "$file" | grep -E '(^|[^[:alnum:]_.-])curl[[:space:]]+-' || true)
+
+        while IFS= read -r line; do
+            case "$line" in
+                *--tries=*) continue ;;
+            esac
+            offenders="${offenders}
+  ${file#"$REPO_ROOT"/}: ${line#"${line%%[![:space:]]*}"}"
+        done < <(_logical_lines "$file" | grep -E '(^|[^[:alnum:]_.-])wget[[:space:]]+-' || true)
+    done < <(_networked_files)
+
+    if [ -n "$offenders" ]; then
+        echo "network fetches with no retry (curl needs --retry, wget --tries=):$offenders" >&2
+        return 1
+    fi
+}

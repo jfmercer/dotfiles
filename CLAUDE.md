@@ -439,3 +439,25 @@ Three things worth preserving:
 - **`shellcheck` is installed twice** — in `lint`, and again in `workflows` where actionlint shells out to it. That is why its `bump-deps` pin uses `occurrences: "all"`. The alternative, ubuntu-latest's preinstalled shellcheck, is unpinned, which is the drift `lint` pins against in the first place.
 
 CI cannot catch macOS-Homebrew-on-`PATH` bugs: GitHub's macOS runners ship Homebrew already on `PATH`, which is exactly why the Apple Silicon bootstrap could break undetected. Test that on a real clean machine or VM.
+
+#### Every network fetch retries, and `invariants.bats` enforces it
+
+A single `apply` job makes roughly **300 network requests** — 208 crate downloads to build `git-delta`, 74 apt index and package fetches, plus rustup, lazygit, chezmoi and its 14 externals. None of them used to retry. At any realistic per-request failure rate the *job* therefore failed far more often than any one request did, and with four network-heavy jobs (`apply` and `bootstrap` × two platforms) a fully green run was close to a coin flip. The weekly dependency-bump PR nearly always needed a manual re-run: 4 attempts on 2026-09-07, 3 on 2026-09-14. Every recorded failure was an HTTP 503/504 from GitHub or a dropped connection — never a checksum mismatch, never a real defect.
+
+The fix has to work at three levels, because a flag on `curl` reaches only the first:
+
+| Level | Where | How |
+|---|---|---|
+| Our own requests | `ci.yaml`, `install.sh`, `install_dotfiles.sh`, the linux installs template | `curl --retry 5 --retry-all-errors --connect-timeout 15`, `wget --tries=5 --waitretry=2 --timeout=15` |
+| Operations that fetch *internally* | `get.chezmoi.io` and the Homebrew installer (both download a payload after the script we fetched), `chezmoi apply` (externals go through chezmoi's own Go HTTP client, which has **no** retry option — `--refresh-externals` is the only related flag), `git clone` | `scripts/retry.sh <attempts> <cmd…>`, or the duplicated `retry()` in `install_dotfiles.sh` |
+| Tool-native knobs | apt, cargo, Homebrew | `Acquire::Retries` written once to `/etc/apt/apt.conf.d/80-retries`, `CARGO_NET_RETRY=5`, `HOMEBREW_CURL_RETRIES=3` |
+
+Three details that look arbitrary and are not:
+
+- **`install.sh` execs the retry wrapper rather than chezmoi.** Retrying is safe because apply is idempotent — and this repo asserts that rather than assuming it, since CI applies a second time and fails on drift. Held to 3 attempts, not 5, because a *genuine* failure re-runs the install scripts each time.
+- **`curl | tar` became download-then-extract.** Retrying a pipe is unsafe: curl restarts from byte zero while tar has already consumed the partial body. It also fixed a latent bug — a `run:` block has no `pipefail`, so curl's exit status was discarded and those steps only failed because tar choked on the empty input.
+- **`install_dotfiles.sh` duplicates `retry()` instead of calling `scripts/retry.sh`.** It is the documented `curl | bash` entry point, so it runs before the repository holding that helper has been cloned. Keep the two in step.
+
+`--retry-all-errors` means a 404 is retried too, so a genuinely wrong pin fails about 10s slower. That is deliberate: the alternative is not retrying a connection dropped mid-transfer, which is the other signature on record.
+
+The `invariants.bats` test *"every curl and wget invocation asks for retries"* derives its file list from globs and joins backslash continuations before judging, so a multi-line invocation is read as one command and a new workflow or script is covered rather than silently exempt. Do not drop it: removing a retry flag breaks nothing until the next transient outage, which is precisely when nobody wants to be rediscovering this section.

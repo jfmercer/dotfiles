@@ -65,7 +65,19 @@ jobs:
             *)             plat=linux.x86_64 ;;
           esac
           url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.${plat}.tar.xz"
-          curl -fsSL "$url" | tar -xJf - -C /tmp
+          # --retry covers 408/429/5xx and connection failures; --retry-all-errors
+          # extends that to a connection dropped mid-transfer, which is the other
+          # signature on record. curl's default retry delay is already exponential,
+          # so it is left unset. A 404 is now retried too -- a genuinely wrong pin
+          # fails ~10s slower, which is a fair price for not re-running the job.
+          #
+          # Downloaded to a file rather than piped into tar. Retrying a pipe is
+          # unsafe: curl restarts the transfer from byte zero and tar has already
+          # consumed the partial body. It also fixes a latent bug -- `curl | tar`
+          # in a `run:` block has no pipefail, so curl's exit status was discarded
+          # and these steps only failed because tar choked on the empty input.
+          curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/shellcheck.tar.xz "$url"
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
           sudo install "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
           shellcheck --version
 
@@ -82,7 +94,11 @@ jobs:
         run: |
           if ! command -v zsh >/dev/null 2>&1; then
             if [ "$RUNNER_OS" = "Linux" ]; then
-              sudo apt-get update && sudo apt-get install -y zsh
+              # Acquire::Retries: apt does not retry a failed mirror fetch by
+              # default, and an apt index fetch is as prone to a transient 5xx
+              # as any other download here.
+              sudo apt-get -o Acquire::Retries=3 update \
+                && sudo apt-get -o Acquire::Retries=3 install -y zsh
             else
               echo "zsh not found and no install path for $RUNNER_OS" >&2
               exit 1
@@ -167,7 +183,8 @@ jobs:
             *)             target=x86_64-unknown-linux-gnu ;;
           esac
           url="https://github.com/astral-sh/ruff/releases/download/${RUFF_VERSION}/ruff-${target}.tar.gz"
-          curl -fsSL "$url" | tar -xzf - -C /tmp
+          curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/ruff.tar.gz "$url"
+          tar -xzf /tmp/ruff.tar.gz -C /tmp
           sudo install "/tmp/ruff-${target}/ruff" /usr/local/bin/ruff
           ruff --version
 
@@ -186,7 +203,14 @@ jobs:
         run: |
           # .chezmoiscripts/** are Go templates, so they must be rendered before
           # they are valid shell. Use the non-interactive template defaults.
-          sh -c "$(curl -fsSL https://get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          #
+          # Fetch and run are retried separately, mirroring install.sh: --retry
+          # on the curl only protects fetching the installer script, while the
+          # chezmoi binary is downloaded by that script over a connection our
+          # flags cannot reach. That inner download is what returned 504 on
+          # 2026-09-07 and 2026-09-14.
+          installer="$(scripts/retry.sh 5 curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 https://get.chezmoi.io)"
+          scripts/retry.sh 5 sh -c "$installer" -- -b "$HOME/.local/bin"
           export PATH="$HOME/.local/bin:$PATH"
           chezmoi init --source="$PWD"
           rc=0
@@ -234,7 +258,8 @@ jobs:
           SHELLCHECK_VERSION: v0.11.0
         run: |
           url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-          curl -fsSL "$url" | tar -xJf - -C /tmp
+          curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/shellcheck.tar.xz "$url"
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
           sudo install "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
           shellcheck --version
 
@@ -249,7 +274,8 @@ jobs:
         run: |
           v="${ACTIONLINT_VERSION#v}"
           url="https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/actionlint_${v}_linux_amd64.tar.gz"
-          curl -fsSL "$url" | tar -xzf - -C /tmp actionlint
+          curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/actionlint.tar.gz "$url"
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
           sudo install /tmp/actionlint /usr/local/bin/actionlint
           actionlint --version
 
@@ -258,7 +284,8 @@ jobs:
           ZIZMOR_VERSION: v1.30.1
         run: |
           url="https://github.com/zizmorcore/zizmor/releases/download/${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
-          curl -fsSL "$url" | tar -xzf - -C /tmp zizmor
+          curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/zizmor.tar.gz "$url"
+          tar -xzf /tmp/zizmor.tar.gz -C /tmp zizmor
           sudo install /tmp/zizmor /usr/local/bin/zizmor
           zizmor --version
 
@@ -339,7 +366,7 @@ jobs:
           BATS_SHA256: bb537b70b15b732f6d8827dd6578e3d8ce166636ce1f18ea9a074184fcce9177
         run: |
           url="https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz"
-          curl -fsSLo /tmp/bats.tar.gz "$url"
+          curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/bats.tar.gz "$url"
           echo "${BATS_SHA256}  /tmp/bats.tar.gz" | shasum -a 256 -c -
           tar -xzf /tmp/bats.tar.gz -C /tmp
           sudo "/tmp/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
@@ -363,7 +390,8 @@ jobs:
               exit 1
             fi
             # shellcheck disable=SC2086
-            sudo apt-get update && sudo apt-get install -y $missing
+            sudo apt-get -o Acquire::Retries=3 update \
+              && sudo apt-get -o Acquire::Retries=3 install -y $missing
           fi
           jq --version
           zsh --version
@@ -373,7 +401,10 @@ jobs:
       # suite -- so install it explicitly.
       - name: Install chezmoi
         run: |
-          sh -c "$(curl -fsSL https://get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          # See the note in `lint` on why fetch and run are retried separately:
+          # the binary download happens inside upstream's installer script.
+          installer="$(scripts/retry.sh 5 curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 https://get.chezmoi.io)"
+          scripts/retry.sh 5 sh -c "$installer" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # The suite runs once; the skip check reads its output rather than running

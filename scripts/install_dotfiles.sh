@@ -36,6 +36,37 @@ error() {
   exit 1
 }
 
+# Deliberately duplicates scripts/retry.sh rather than calling it. This script is
+# the documented `curl | bash` entry point, so it runs before the repository it
+# would source that helper from has been cloned. Keep the two in step.
+retry() {
+  local attempts="$1"; shift
+  local attempt=1 delay=2 status=0
+
+  while :; do
+    status=0
+    "$@" || status=$?
+    # if/then, not `[ ... ] && return 0`: under `set -e` a short-circuited &&
+    # list is itself a failed command, which would kill the caller.
+    if [ "$status" -eq 0 ]; then
+      return 0
+    fi
+
+    if [ "$attempt" -ge "$attempts" ]; then
+      log_error "'$1' failed on attempt ${attempt}/${attempts} (exit ${status}); giving up"
+      return "$status"
+    fi
+
+    log_task "'$1' failed on attempt ${attempt}/${attempts} (exit ${status}); retrying in ${delay}s"
+    sleep "$delay"
+    attempt=$((attempt + 1))
+    delay=$((delay * 2))
+    if [ "$delay" -gt 30 ]; then
+      delay=30
+    fi
+  done
+}
+
 fancy_echo() {
   local fmt="$1"; shift
 
@@ -161,7 +192,15 @@ if [[ $(command -v brew) == "" ]] && is_macos; then
     fi
 
     echo "Installing homebrew"
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Fetch and run retried separately, as in install.sh: the flags on the curl
+    # only cover fetching the installer, which then downloads Homebrew itself
+    # over connections they cannot reach. `env` rather than a `VAR=x cmd` prefix
+    # because retry runs its arguments as "$@", where a prefix assignment would
+    # be taken as the command name.
+    brew_installer="$(retry 5 curl -fsSL --retry 5 --retry-all-errors \
+      --connect-timeout 15 https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    retry 3 env NONINTERACTIVE=1 /bin/bash -c "${brew_installer}"
+    unset brew_installer
 fi
 
 # Put brew on PATH for the rest of this process. Homebrew's installer does not
@@ -183,7 +222,13 @@ if [ -d "${DOTFILES_DIR}" ]; then
   git_update "${DOTFILES_DIR}" "${DOTFILES_REPO}" "${DOTFILES_BRANCH}"
 else
   log_task "Cloning '${DOTFILES_REPO}' at branch '${DOTFILES_BRANCH}' to '${DOTFILES_DIR}'"
-  git clone --branch "${DOTFILES_BRANCH}" "${DOTFILES_REPO}" "${DOTFILES_DIR}"
+  # git has no retry of its own, and a failed clone leaves a partial directory
+  # that would make the retry fail as "already exists" -- so clear it first.
+  clone_dotfiles() {
+    rm -rf "${DOTFILES_DIR}"
+    git clone --branch "${DOTFILES_BRANCH}" "${DOTFILES_REPO}" "${DOTFILES_DIR}"
+  }
+  retry 3 clone_dotfiles
 fi
 
 if [ -f "${DOTFILES_DIR}/install.sh" ]; then
