@@ -11,6 +11,13 @@ fi
 # Keep-alive: update existing `sudo` time stamp until linux installs have finished
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
+# apt does not retry a failed mirror fetch by default, and one `apt update` here
+# pulls ~74 index and package files -- each one a chance to fail the whole
+# script. Set the policy once rather than passing -o to each of the six apt
+# invocations below, so a call added later inherits it instead of silently
+# opting out.
+echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+
 sudo apt update
 
 packages=(
@@ -153,7 +160,7 @@ if [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
     # then trust an apt repo signed by it.
     # Bump: curl -fsSL <deb.asc url> | gpg --show-keys --with-colons | awk -F: '/^fpr:/{print $10}'
     keyfile=$(mktemp)
-    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc > "$keyfile"
+    wget --tries=5 --waitretry=2 --timeout=15 -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc > "$keyfile"
     got_fpr=$(gpg --show-keys --with-colons "$keyfile" | awk -F: '/^fpr:/{print $10; exit}')
     if [ "$got_fpr" != "$EZA_KEY_FPR" ]; then
         echo "eza signing key fingerprint mismatch!" >&2
@@ -191,7 +198,7 @@ if [ ! -f /etc/apt/sources.list.d/charm.list ]; then
     sudo mkdir -p /etc/apt/keyrings
     # Bump: curl -fsSL https://repo.charm.sh/apt/gpg.key | gpg --show-keys --with-colons | awk -F: '/^fpr:/{print $10}'
     keyfile=$(mktemp)
-    wget -qO- https://repo.charm.sh/apt/gpg.key > "$keyfile"
+    wget --tries=5 --waitretry=2 --timeout=15 -qO- https://repo.charm.sh/apt/gpg.key > "$keyfile"
     got_fpr=$(gpg --show-keys --with-colons "$keyfile" | awk -F: '/^fpr:/{print $10; exit}')
     if [ "$got_fpr" != "$CHARM_KEY_FPR" ]; then
         echo "charm signing key fingerprint mismatch!" >&2
@@ -278,6 +285,7 @@ esac
 rustup_tmp=$(mktemp -d)
 rustup_init="${rustup_tmp}/rustup-init"
 curl --proto '=https' --tlsv1.2 -sSf \
+    --retry 5 --retry-all-errors --connect-timeout 15 \
     "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rustup_target}/rustup-init" \
     -o "$rustup_init"
 # NB: sha256sum, not shasum -- this script is Debian-only and sha256sum comes
@@ -303,6 +311,13 @@ rm -rf "$rustup_tmp"
 # shellcheck source=/dev/null
 source "$HOME/.cargo/env"
 
+# Building git-delta pulls 208 crates from crates.io, which is by far the
+# largest concentration of network requests in this script. cargo retries
+# spurious network errors on its own but only twice by default; raise it rather
+# than wrap the cargo calls, since cargo can resume where a wrapper would
+# restart the whole build.
+export CARGO_NET_RETRY=5
+
 # install delta
 cargo install git-delta
 
@@ -320,9 +335,9 @@ fi
 # matches nothing there and aborts the script under `set -o pipefail`.
 LAZYGIT_TARBALL="lazygit_${LAZYGIT_VERSION}_linux_${LAZYGIT_ARCH}.tar.gz"
 LAZYGIT_BASE="https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}"
-curl -fLo lazygit.tar.gz "${LAZYGIT_BASE}/${LAZYGIT_TARBALL}"
+curl -fL --retry 5 --retry-all-errors --connect-timeout 15 -o lazygit.tar.gz "${LAZYGIT_BASE}/${LAZYGIT_TARBALL}"
 # Upstream publishes checksums.txt per release; verify against it.
-curl -fLo lazygit-checksums.txt "${LAZYGIT_BASE}/checksums.txt"
+curl -fL --retry 5 --retry-all-errors --connect-timeout 15 -o lazygit-checksums.txt "${LAZYGIT_BASE}/checksums.txt"
 grep " ${LAZYGIT_TARBALL}\$" lazygit-checksums.txt | sed "s|${LAZYGIT_TARBALL}|lazygit.tar.gz|" | sha256sum -c -
 tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
