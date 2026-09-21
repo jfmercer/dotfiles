@@ -28,14 +28,14 @@
         sha256: "20b4c895f98d13848204698068c4dd031730d4e7c9c4b630d6273b9b9afcdcdb"
 
 # zsh plugins
-# sindresorhus/pure @ 2026-07-16 (nearest tag: v1.28.3)
+# sindresorhus/pure @ 2026-09-19 (nearest tag: v1.28.3)
 ".local/zsh-plugins/pure":
     type: "archive"
-    url: "https://github.com/sindresorhus/pure/archive/89c9e30a38d3d35457bcc58b43ea6c28ae56934b.tar.gz"
+    url: "https://github.com/sindresorhus/pure/archive/90c6a129b46bde1d656244c68a3ae142b78e0cc3.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "4e416cea4b75f68f42b70bc8ed154de94960422fa5471ae49f8baa09251e0323"
+        sha256: "e33005c798956b1bcc8d673a80e4bfba6fe29ba877acb25d0eb821d521297c7f"
 # zsh-users/zsh-autosuggestions @ 2025-06-24 (nearest tag: v0.7.1)
 ".local/zsh-plugins/zsh-autosuggestions":
     type: "archive"
@@ -44,30 +44,30 @@
     stripComponents: 1
     checksum:
         sha256: "20665e469e720e674964a66854d5534b9af78cdfd438512746ecd1ade8e819ce"
-# zsh-users/zsh-completions @ 2026-09-06 (nearest tag: 0.36.0)
+# zsh-users/zsh-completions @ 2026-09-21 (nearest tag: 0.36.0)
 ".local/zsh-plugins/zsh-completions":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-completions/archive/de02bb84ab0af51e328c6ae85ab5555397c31277.tar.gz"
+    url: "https://github.com/zsh-users/zsh-completions/archive/b5e8e0a22deb05a807bb8655aef809a29f3cffed.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "d07a49af20fbf31cd1c8970c426093336ab8690038e96a06f3647d3fbace4eb9"
-# zsh-users/zsh-history-substring-search @ 2026-01-15 (nearest tag: v1.1.0)
+        sha256: "2a7a140e2698f39fb215a0ea86694c8c59ad51c97133cf3f2709c46dfe28bf34"
+# zsh-users/zsh-history-substring-search @ 2026-09-18 (nearest tag: v1.1.0)
 ".local/zsh-plugins/zsh-history-substring-search":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-history-substring-search/archive/14c8d2e0ffaee98f2df9850b19944f32546fdea5.tar.gz"
+    url: "https://github.com/zsh-users/zsh-history-substring-search/archive/a0bdb0d47dbaba31dba2db7af8c48a5d9c74049a.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "823ea186446669fb024b839b117122d03ee0b3b20e199c95e09e85695bd30b0f"
-# zsh-users/zsh-syntax-highlighting @ 2026-08-22 (nearest tag: 0.8.0)
+        sha256: "b9edc11a4a04d2a5cc23bb7bafd8f02935240a45efe8a2fa61605b7636ecb22f"
+# zsh-users/zsh-syntax-highlighting @ 2026-09-17 (nearest tag: 0.8.0)
 ".local/zsh-plugins/zsh-syntax-highlighting":
     type: "archive"
-    url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/2fc57d63067c18b1100ecdbf684fa5baf49459d1.tar.gz"
+    url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/0bfcb582e71d3abe604ce67bc0fe5a21f377507e.tar.gz"
     exact: true
     stripComponents: 1
     checksum:
-        sha256: "ae951d550009375138c7a029f908a7cb255861ed16701a2c6ea62f17e7e7df69"
+        sha256: "898766fe913588bb8e022ccddc263fc618a1308da914d397cd8b0c305b8ad3aa"
 # agkozak/zsh-z @ 2026-08-14 (nearest tag: v2.0.0)
 ".local/zsh-plugins/zsh-z":
     type: "archive"
