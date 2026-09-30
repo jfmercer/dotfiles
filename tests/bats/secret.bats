@@ -311,6 +311,99 @@ STUB
     assert_equal "$output" ""
 }
 
+# ------------------------------------------- layer 2: bundle variables by name
+
+# Store shell text $1 as the bundle, bypassing env-edit.
+seed_bundle() {
+    seed_secret "$SECRET_ENV_NAME" "$(printf '%s' "$1" | base64 | tr -d '\n')"
+}
+
+@test "get reads a variable that exists only in the bundle" {
+    seed_bundle $'export ARMORCODE_API_KEY=\'from-bundle\'\n'
+    run "$SECRET" get ARMORCODE_API_KEY
+    assert_success
+    assert_equal "$output" "from-bundle"
+}
+
+@test "get reads the bundle, not a stale copy in the caller's environment" {
+    # ~/.localrc exports every bundle variable, so the old value is always in
+    # the environment when `secret` runs.
+    seed_bundle $'export TOK=\'new\'\n'
+    TOK=old run "$SECRET" get TOK
+    assert_success
+    assert_equal "$output" "new"
+}
+
+@test "get of a bundle value keeps embedded quotes and trailing newlines" {
+    seed_bundle $'export V=\'it\'\\\'\'s\n\n\'\n'
+    "$SECRET" get V >"$BATS_TEST_TMPDIR/got"
+    printf '%s\n' "it's"$'\n\n' >"$BATS_TEST_TMPDIR/want"
+    cmp "$BATS_TEST_TMPDIR/want" "$BATS_TEST_TMPDIR/got"
+}
+
+@test "rotate rewrites only that variable's line in the bundle" {
+    seed_bundle $'# keep me\nexport A=\'a\'\nexport B=\'old\'\nexport C=\'c\'\n'
+    run bash -c "printf \"n'ew\" | '$SECRET' rotate B"
+    assert_success
+    assert_output_contains "Rotated \$B in env bundle 'bats-shell-env'"
+    run "$SECRET" env
+    assert_equal "$output" $'# keep me\nexport A=\'a\'\nexport B=\'n\'\\\'\'ew\'\nexport C=\'c\''
+    run "$SECRET" get B
+    assert_equal "$output" "n'ew"
+}
+
+@test "set on a bundle variable updates the bundle, not a new item" {
+    seed_bundle $'export TOK=\'old\'\n'
+    run bash -c "printf 'new' | '$SECRET' set TOK"
+    assert_success
+    assert_output_contains "Stored \$TOK in env bundle"
+    [ ! -e "$FAKE_KEYCHAIN/${SECRET_ACCOUNT}__TOK" ]
+    run "$SECRET" get TOK
+    assert_equal "$output" "new"
+}
+
+@test "rm deletes a bundle variable and leaves the rest" {
+    seed_bundle $'export A=\'a\'\nexport B=\'b\'\n'
+    run "$SECRET" rm A
+    assert_success
+    assert_output_contains "Deleted \$A from env bundle"
+    run "$SECRET" env
+    assert_equal "$output" "export B='b'"
+}
+
+@test "rotate refuses a bundle variable spanning several lines" {
+    seed_bundle $'export M=\'line1\nline2\'\n'
+    run bash -c "printf 'new' | '$SECRET' rotate M"
+    assert_failure
+    assert_output_contains "not a single one-line assignment"
+    assert_output_contains "secret env-edit"
+    assert_no_writes
+}
+
+@test "rotate refuses a bundle variable assigned twice" {
+    seed_bundle $'export D=\'1\'\nexport D=\'2\'\n'
+    run bash -c "printf 'new' | '$SECRET' rotate D"
+    assert_failure
+    assert_output_contains "not a single one-line assignment"
+    assert_no_writes
+}
+
+@test "a lookalike line inside another value is not mistaken for a variable" {
+    seed_secret item $'x\nexport FAKE=y'
+    printf 'REAL=item\n' | "$SECRET" env-import >/dev/null 2>&1
+    run "$SECRET" get FAKE
+    assert_failure
+    assert_output_contains "no secret named 'FAKE'"
+}
+
+@test "names absent from the bundle still reach standalone items" {
+    seed_bundle $'export A=\'a\'\n'
+    seed_secret snyk_api_key 'standalone'
+    run "$SECRET" get snyk_api_key
+    assert_success
+    assert_equal "$output" "standalone"
+}
+
 # --------------------------------------------------------------- layer 2: CLI
 
 @test "no arguments prints usage and succeeds" {
