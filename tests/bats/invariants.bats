@@ -441,7 +441,7 @@ _networked_files() {
 }
 
 @test "every curl and wget invocation asks for retries" {
-    # A single apply job makes ~300 network requests (208 crates, 74 apt fetches,
+    # A single apply job made ~300 network requests (208 crates, 74 apt fetches,
     # plus rustup/lazygit/chezmoi and its 14 externals). With no retries the job
     # failed far more often than any one request did, and the weekly dependency
     # PR nearly always needed a manual re-run -- every recorded failure an HTTP

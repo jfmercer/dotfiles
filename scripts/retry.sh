@@ -2,8 +2,9 @@
 
 # Retry a command that touches the network.
 #
-# Why this exists: a single `apply` job makes roughly 300 network requests --
-# 208 crate downloads for git-delta, 74 apt fetches, plus rustup, lazygit,
+# Why this exists: a single `apply` job made roughly 300 network requests --
+# 208 crate downloads for git-delta (since replaced by prebuilt binaries),
+# 74 apt fetches, plus rustup, lazygit,
 # chezmoi and its 14 externals. None of them used to retry, so at a realistic
 # per-request failure rate the *job* failed far more often than any one request
 # did, and the weekly dependency-bump PR nearly always needed a manual re-run.
