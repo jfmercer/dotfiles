@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-26.04]
     steps:
       # Pinned to a commit, not the v7.0.1 tag. Same reasoning as
       # .chezmoiexternal.yaml: a tag can be force-moved by anyone who can push
@@ -238,19 +238,19 @@ jobs:
   # shell that no other job sees), zizmor for security (token scope, credential
   # persistence, template injection, action provenance).
   #
-  # ubuntu-latest only, deliberately, unlike `lint` and `test`: those are matrixed
+  # ubuntu-26.04 only, deliberately, unlike `lint` and `test`: those are matrixed
   # because the .chezmoiscripts/{darwin,linux} templates render per-OS, whereas
   # workflow analysis is platform-independent. One runner also means one pinned
   # version per tool instead of two.
   workflows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       # actionlint shells out to shellcheck for `run:` blocks and silently skips
-      # that rule if it is missing. ubuntu-latest ships a shellcheck, but an
+      # that rule if it is missing. ubuntu-26.04 ships a shellcheck, but an
       # unpinned one -- the exact drift the `lint` job pins against -- so install
       # the same version here rather than inherit whatever the image has.
       - name: Install shellcheck
@@ -342,7 +342,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -425,7 +425,7 @@ jobs:
           echo "no skipped tests"
 
   secrets:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -449,7 +449,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -512,7 +512,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -426,7 +426,7 @@ Three things worth preserving:
 
 - **`apply` tests the checkout, not the remote.** It used to run `install_dotfiles.sh`, which clones `master` from GitHub and discards `actions/checkout` output entirely — so pull requests never tested their own code and fork PRs silently validated `master`.
 - **The drift gate is `chezmoi status --exclude=scripts`, not `chezmoi verify`.** The four plain `run_after_` scripts are meant to run on every apply, so they are permanently "pending" and bare `chezmoi verify` can never exit 0.
-- **`shellcheck` is installed twice** — in `lint`, and again in `workflows` where actionlint shells out to it. That is why its `bump-deps` pin uses `occurrences: "all"`. The alternative, ubuntu-latest's preinstalled shellcheck, is unpinned, which is the drift `lint` pins against in the first place.
+- **`shellcheck` is installed twice** — in `lint`, and again in `workflows` where actionlint shells out to it. That is why its `bump-deps` pin uses `occurrences: "all"`. The alternative, ubuntu-26.04's preinstalled shellcheck, is unpinned, which is the drift `lint` pins against in the first place.
 
 CI cannot catch macOS-Homebrew-on-`PATH` bugs: GitHub's macOS runners ship Homebrew already on `PATH`, which is exactly why the Apple Silicon bootstrap could break undetected. Test that on a real clean machine or VM.
 

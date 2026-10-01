@@ -36,7 +36,7 @@ env:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       # The GITHUB_TOKEN's only write is the tracking issue. The branch and the
