@@ -26,8 +26,9 @@ fingerprint, for instance, would defeat the entire reason it is pinned.
   CONTENT  A sha256 over an *unversioned* URL. There is no version to compare;
            a change means upstream rewrote the file. That is a trust decision,
            so it is reported and requires --accept. The registry is currently
-           empty: rustup was the only member and moved to VERSION once it turned
-           out upstream publishes an immutable archive/<version>/ path. The
+           empty: rustup was the only member, moved to VERSION once it turned
+           out upstream publishes an immutable archive/<version>/ path, and was
+           later dropped altogether when nothing needed cargo any more. The
            class is kept because the shape recurs -- install.sh still curls
            get.chezmoi.io, and the Homebrew bootstrap still curls a HEAD URL,
            neither of which is pinned at all today.
@@ -78,10 +79,12 @@ VERSION_FLOOR = ".chezmoiversion"
 #              aborts rather than silently editing the wrong number of lines.
 #   strip_v    upstream tags are vX.Y.Z but this pin stores X.Y.Z.
 #   latest_url where to read the current stable version, for projects that do
-#              not cut GitHub Releases (rust-lang/rustup only tags, so
-#              `gh api .../releases/latest` 404s). Paired with latest_pattern.
+#              not cut GitHub Releases (`gh api .../releases/latest` 404s on a
+#              repo with tags only). Paired with latest_pattern. No pin uses it
+#              today -- rustup did -- but it is kept, and tested, because that
+#              shape of upstream recurs.
 #   hashes     checksums derived from the version, rewritten with it. See the
-#              rustup entry for why these are not pins in their own right.
+#              delta entry for why these are not pins in their own right.
 # --------------------------------------------------------------------------
 VERSION_PINS = [
     {
@@ -151,43 +154,72 @@ VERSION_PINS = [
         "strip_v": True,
     },
     {
-        # Was a CONTENT pin -- a hash over https://sh.rustup.rs, which is
-        # unversioned. That broke CI on upstream's release schedule (the script
-        # embeds its own version banner, so every release changes the hash) and
-        # could not be bumped unattended, since a CHANGED content pin is routed
-        # to the tracking issue by design. Worse, it was securing the wrong
-        # thing: rustup-init.sh does no integrity check on the binary it
-        # downloads, and pulls it from the floating dist/ path, so the payload
-        # was unpinned while the wrapper was scrutinized.
-        #
-        # The install script now fetches the binary from the immutable
-        # archive/<version>/ path directly, which makes this a plain version
-        # pin. The two hashes are the binaries at that version -- derived, not
-        # independent -- so apply_versions() recomputes them from the new
-        # version's URLs and rewrites all three together. Registering a third
-        # architecture means adding it here *and* to the case statement in
-        # LINUX; the invariant below fails if the two disagree.
-        #
-        # rustup publishes no GitHub Releases, only tags, so the stable version
-        # comes from upstream's own release-stable.toml rather than from gh.
-        "name": "rustup",
+        # Prebuilt release binaries, verified against hashes we compute
+        # ourselves: delta publishes no checksum file. The hashes are a pure
+        # function of the version -- derived, not independent -- so
+        # apply_versions() recomputes them from the new version's URLs and
+        # rewrites all three together. Registering a third architecture means
+        # adding it here *and* to the case statement in LINUX; the invariant
+        # below fails if the two disagree.
+        "name": "delta",
         "file": LINUX,
-        "pattern": r'RUSTUP_VERSION="([^"]+)"',
-        "repo": "rust-lang/rustup",
-        "latest_url": "https://static.rust-lang.org/rustup/release-stable.toml",
-        "latest_pattern": r"^version\s*=\s*'([^']+)'",
+        "pattern": r'DELTA_VERSION="([^"]+)"',
+        "repo": "dandavison/delta",
         "occurrences": 1,
         "strip_v": False,
         "hashes": [
             {
-                "pattern": r'RUSTUP_INIT_SHA256_X86_64="([0-9a-f]{64})"',
-                "url": "https://static.rust-lang.org/rustup/archive/{version}"
-                "/x86_64-unknown-linux-gnu/rustup-init",
+                "pattern": r'DELTA_SHA256_X86_64="([0-9a-f]{64})"',
+                "url": "https://github.com/dandavison/delta/releases/download/{version}"
+                "/delta-{version}-x86_64-unknown-linux-gnu.tar.gz",
             },
             {
-                "pattern": r'RUSTUP_INIT_SHA256_AARCH64="([0-9a-f]{64})"',
-                "url": "https://static.rust-lang.org/rustup/archive/{version}"
-                "/aarch64-unknown-linux-gnu/rustup-init",
+                "pattern": r'DELTA_SHA256_AARCH64="([0-9a-f]{64})"',
+                "url": "https://github.com/dandavison/delta/releases/download/{version}"
+                "/delta-{version}-aarch64-unknown-linux-gnu.tar.gz",
+            },
+        ],
+    },
+    {
+        # As delta. navi has no x86_64 glibc asset, hence musl there.
+        "name": "navi",
+        "file": LINUX,
+        "pattern": r'NAVI_VERSION="([^"]+)"',
+        "repo": "denisidoro/navi",
+        "occurrences": 1,
+        "strip_v": True,
+        "hashes": [
+            {
+                "pattern": r'NAVI_SHA256_X86_64="([0-9a-f]{64})"',
+                "url": "https://github.com/denisidoro/navi/releases/download/v{version}"
+                "/navi-v{version}-x86_64-unknown-linux-musl.tar.gz",
+            },
+            {
+                "pattern": r'NAVI_SHA256_AARCH64="([0-9a-f]{64})"',
+                "url": "https://github.com/denisidoro/navi/releases/download/v{version}"
+                "/navi-v{version}-aarch64-unknown-linux-gnu.tar.gz",
+            },
+        ],
+    },
+    {
+        # As delta. tree-sitter's asset is a gzipped bare binary with no version
+        # in its filename; the version is only in the tag path.
+        "name": "tree-sitter",
+        "file": LINUX,
+        "pattern": r'TREE_SITTER_VERSION="([^"]+)"',
+        "repo": "tree-sitter/tree-sitter",
+        "occurrences": 1,
+        "strip_v": True,
+        "hashes": [
+            {
+                "pattern": r'TREE_SITTER_SHA256_X86_64="([0-9a-f]{64})"',
+                "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v{version}"
+                "/tree-sitter-linux-x64.gz",
+            },
+            {
+                "pattern": r'TREE_SITTER_SHA256_AARCH64="([0-9a-f]{64})"',
+                "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v{version}"
+                "/tree-sitter-linux-arm64.gz",
             },
         ],
     },
@@ -378,7 +410,7 @@ def companion_pin(pin: dict, hash_spec: dict) -> dict:
     """
     return {
         # Named for the variable it rewrites, not just the parent pin: a pin can
-        # carry several, and "rustup hash" twice in a self-test report tells you
+        # carry several, and "delta hash" twice in a self-test report tells you
         # nothing about which architecture failed.
         "name": hash_spec["pattern"].split('="', 1)[0],
         "file": pin["file"],

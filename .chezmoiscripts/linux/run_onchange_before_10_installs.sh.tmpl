@@ -143,13 +143,19 @@ EZA_KEY_FPR="1548BC8A4B4D2688F9B0DAF7EC29E2090CE3FD43" # gitleaks:allow
 # it lapses upstream will publish a new one and the check below will fail loudly
 # -- that is a rotation to verify by hand, not a bug to work around.
 CHARM_KEY_FPR="ED927B38BE981E53CA09153D03BBF595D4DFD35C" # gitleaks:allow
-# rustup, pinned by version rather than by a hash over an unversioned URL. The
-# two hashes below are a pure function of this version -- they are the binaries
-# under archive/${RUSTUP_VERSION}/ -- so all three move together or not at all.
-RUSTUP_VERSION="1.29.1"
-RUSTUP_INIT_SHA256_X86_64="dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
-RUSTUP_INIT_SHA256_AARCH64="15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433"
 LAZYGIT_VERSION="0.65.1"
+# delta, navi and tree-sitter publish no checksum files, so these hashes are our
+# own -- computed from the release assets at that version, and moved with it by
+# bin/bump-deps --apply. Never edit a version without its hashes.
+DELTA_VERSION="0.19.2"
+DELTA_SHA256_X86_64="8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2"
+DELTA_SHA256_AARCH64="0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e"
+NAVI_VERSION="2.24.0"
+NAVI_SHA256_X86_64="f334047479241f7c8b48d091f4e814dcc798a51a74dfd04ee63cbf67e8c921ba"
+NAVI_SHA256_AARCH64="de99e69906a0e06ffd30a329645e15f9e96a6b42c49eaac8baccac9bc314768a"
+TREE_SITTER_VERSION="0.27.0"
+TREE_SITTER_SHA256_X86_64="20a1f39ec1c45f2211492dcb8881c802b643b554bb196869a29ac3778277fa77"
+TREE_SITTER_SHA256_AARCH64="3a35a2dd961ad842384e982c75daf792c01d1a67e442fc3914d4de37bd8a59cb"
 
 # install eza: https://github.com/eza-community/eza#debian-and-ubuntu
 # only set up the apt repo once; re-running is a no-op
@@ -218,108 +224,69 @@ if [ ! -f /etc/apt/sources.list.d/charm.list ]; then
 fi
 sudo apt install -y glow
 
-### RUST INSTALLS
-
-# noninteractive rust install (needed for delta)
+# install delta, navi and tree-sitter from upstream's prebuilt release binaries.
+# These used to be built with cargo, which meant installing a whole Rust
+# toolchain (rustup) and compiling hundreds of crates on every fresh machine.
+# None of them publishes checksums, so the hashes pinned above are what we
+# verify. navi ships no x86_64 glibc build; its musl one is static and runs
+# anywhere. tree-sitter's binaries need glibc >= 2.39 -- fine on Kali, Debian
+# trixie and Ubuntu 24.04, not on bookworm (which LazyVim's floor already rules
+# out, see neovim above).
 #
-# Upstream's documented route is `curl https://sh.rustup.rs | sh`, and we
-# deliberately do not use that script at all. Two reasons, both from reading it:
-#
-#   - It is served from an *unversioned* URL, so the only thing there is to pin
-#     is a hash over whatever it happens to serve today. Upstream rewrites it on
-#     every release (the version banner alone changes), so that pin breaks the
-#     build on their release schedule rather than on our upgrades, and it cannot
-#     be bumped unattended because a changed hash is indistinguishable from a
-#     tampered one.
-#   - It performs no integrity check at all on the binary it downloads. The only
-#     SHA256 in its ~930 lines is a TLS cipher list. It fetches rustup-init from
-#     the floating `dist/` path and executes it on TLS trust alone -- so pinning
-#     the script's hash secured the wrapper while leaving the payload, the part
-#     that actually runs, entirely unpinned.
-#
-# So we do what that script does, minus what we do not need: resolve the host
-# triple, fetch that binary from the immutable archive/<version>/ path, verify
-# it against the hash pinned above, and run it. The arch mapping is short
-# because this script is Debian-only: most of upstream's get_architecture()
-# covers Darwin/Rosetta, Android, Windows, illumos/Solaris, the BSDs, musl and
-# the 32-bit and big-endian targets, none of which occur here. Anything not
-# listed below is a hard failure rather than a guess.
-#
-# Bump: bin/bump-deps --apply, which moves RUSTUP_VERSION and both hashes as one
-# operation. Never edit one without the others.
-
-# The one Linux case upstream handles that `uname -m` alone cannot: a 64-bit
-# kernel running a 32-bit userland still reports x86_64 or aarch64, and the
-# 64-bit binary would then die with a bare "Exec format error". Upstream reads
-# the ELF header of /proc/self/exe to detect it; getconf reports the same thing
-# in one line, and comes from libc-bin, which is Essential. Only 64-bit builds
-# are pinned here, so this is a refusal rather than a fallback to i686/armv7.
+# `uname -m` cannot see a 64-bit kernel running a 32-bit userland: it still
+# reports x86_64/aarch64, and these 64-bit binaries would die with a bare
+# "Exec format error". getconf comes from libc-bin, which is Essential.
 if [ "$(getconf LONG_BIT)" != "64" ]; then
-    echo "32-bit userland on $(uname -m): only 64-bit rustup builds are pinned here." >&2
+    echo "32-bit userland on $(uname -m): only 64-bit builds are pinned here." >&2
     exit 1
 fi
-
 case "$(uname -m)" in
-    x86_64 | amd64)
-        rustup_target="x86_64-unknown-linux-gnu"
-        rustup_sha256="$RUSTUP_INIT_SHA256_X86_64"
+    x86_64)
+        DELTA_TARGET="x86_64-unknown-linux-gnu"
+        DELTA_SHA256="$DELTA_SHA256_X86_64"
+        NAVI_TARGET="x86_64-unknown-linux-musl"
+        NAVI_SHA256="$NAVI_SHA256_X86_64"
+        TREE_SITTER_TARGET="linux-x64"
+        TREE_SITTER_SHA256="$TREE_SITTER_SHA256_X86_64"
         ;;
-    aarch64 | arm64)
-        rustup_target="aarch64-unknown-linux-gnu"
-        rustup_sha256="$RUSTUP_INIT_SHA256_AARCH64"
+    aarch64)
+        DELTA_TARGET="aarch64-unknown-linux-gnu"
+        DELTA_SHA256="$DELTA_SHA256_AARCH64"
+        NAVI_TARGET="aarch64-unknown-linux-gnu"
+        NAVI_SHA256="$NAVI_SHA256_AARCH64"
+        TREE_SITTER_TARGET="linux-arm64"
+        TREE_SITTER_SHA256="$TREE_SITTER_SHA256_AARCH64"
         ;;
     *)
-        echo "unsupported architecture for rustup: $(uname -m)" >&2
-        echo "Add its triple and pinned hash here and in bin/bump-deps." >&2
+        echo "unsupported architecture for delta/navi/tree-sitter: $(uname -m)" >&2
         exit 1
         ;;
 esac
 
-# The basename is load-bearing, which is why this takes a temp *directory* and
-# names the file inside it rather than using a bare `mktemp`. rustup-init is a
-# multi-call binary: it dispatches on argv[0], and any name other than
-# "rustup-init" is read as the toolchain proxy to forward to. Downloaded to a
-# mktemp path it exits with `unknown proxy name: 'tmp'` -- download fine,
-# checksum verified, nothing wrong but the filename. Upstream's script takes the
-# same precaution, for the same reason.
-rustup_tmp=$(mktemp -d)
-rustup_init="${rustup_tmp}/rustup-init"
-curl --proto '=https' --tlsv1.2 -sSf \
-    --retry 5 --retry-all-errors --connect-timeout 15 \
-    "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rustup_target}/rustup-init" \
-    -o "$rustup_init"
-# NB: sha256sum, not shasum -- this script is Debian-only and sha256sum comes
-# from coreutils (Essential), whereas shasum ships in the non-Essential `perl`
-# package and can be missing on a minimal install.
-echo "${rustup_sha256}  ${rustup_init}" | sha256sum -c - || {
-    echo "rustup-init checksum mismatch -- refusing to run it." >&2
-    echo "archive/${RUSTUP_VERSION}/ is immutable, so this should never drift on" >&2
-    echo "its own: treat a mismatch as a supply-chain problem, not a stale pin." >&2
-    rm -rf "$rustup_tmp"
-    exit 1
-}
-chmod u+x "$rustup_init"
-# mktemp honors TMPDIR, which can be mounted noexec; upstream's script hits the
-# same wall and says so rather than failing as a bare "permission denied".
-if [ ! -x "$rustup_init" ]; then
-    echo "cannot execute $rustup_init (is TMPDIR mounted noexec?)" >&2
-    rm -rf "$rustup_tmp"
-    exit 1
-fi
-"$rustup_init" -y
-rm -rf "$rustup_tmp"
-# shellcheck source=/dev/null
-source "$HOME/.cargo/env"
+DELTA_DIR="delta-${DELTA_VERSION}-${DELTA_TARGET}"
+curl -fL --retry 5 --retry-all-errors --connect-timeout 15 -o delta.tar.gz \
+    "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/${DELTA_DIR}.tar.gz"
+echo "${DELTA_SHA256}  delta.tar.gz" | sha256sum -c -
+tar xf delta.tar.gz "${DELTA_DIR}/delta"
+sudo install "${DELTA_DIR}/delta" /usr/local/bin
+rm -rf delta.tar.gz "${DELTA_DIR}"
 
-# Building git-delta pulls 208 crates from crates.io, which is by far the
-# largest concentration of network requests in this script. cargo retries
-# spurious network errors on its own but only twice by default; raise it rather
-# than wrap the cargo calls, since cargo can resume where a wrapper would
-# restart the whole build.
-export CARGO_NET_RETRY=5
+# navi tags vX.Y.Z and names its assets with the v; NAVI_VERSION omits it.
+curl -fL --retry 5 --retry-all-errors --connect-timeout 15 -o navi.tar.gz \
+    "https://github.com/denisidoro/navi/releases/download/v${NAVI_VERSION}/navi-v${NAVI_VERSION}-${NAVI_TARGET}.tar.gz"
+echo "${NAVI_SHA256}  navi.tar.gz" | sha256sum -c -
+tar xf navi.tar.gz ./navi
+sudo install navi /usr/local/bin
+rm -f navi.tar.gz navi
 
-# install delta
-cargo install git-delta
+# tree-sitter's asset is the bare binary, gzipped -- no tarball, no version in
+# the filename (the version is in the tag path only).
+curl -fL --retry 5 --retry-all-errors --connect-timeout 15 -o tree-sitter.gz \
+    "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-${TREE_SITTER_TARGET}.gz"
+echo "${TREE_SITTER_SHA256}  tree-sitter.gz" | sha256sum -c -
+gunzip -c tree-sitter.gz > tree-sitter
+sudo install tree-sitter /usr/local/bin
+rm -f tree-sitter.gz tree-sitter
 
 # install lazygit
 # Pinned: "latest" meant a silent, unreviewed binary swap on every fresh install.
@@ -342,12 +309,6 @@ grep " ${LAZYGIT_TARBALL}\$" lazygit-checksums.txt | sed "s|${LAZYGIT_TARBALL}|l
 tar xf lazygit.tar.gz lazygit
 sudo install lazygit /usr/local/bin
 rm -f lazygit.tar.gz lazygit-checksums.txt lazygit
-
-# navi
-cargo install --locked navi
-
-cargo install --locked cargo-binstall
-cargo binstall --no-confirm tree-sitter-cli
 
 # Remove packages
 rm_packages=("nano")

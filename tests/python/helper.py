@@ -120,8 +120,8 @@ jobs:
       - uses: actions/checkout@{CHECKOUT_SHA} # v7.0.1
 """
 
-# rustup is a VERSION pin carrying two derived checksums, so the fixture has to
-# show all three: check_invariants() compares the set of *_SHA256* assignments
+# delta is a VERSION pin carrying two derived checksums, so the fixture has to
+# show all three (navi and tree-sitter are the same shape): check_invariants() compares the set of *_SHA256* assignments
 # here against the `hashes` entries registered for the pin, in both directions,
 # and apply_versions() rewrites them together. A fixture with only the version
 # would make both halves of that unreachable.
@@ -129,9 +129,15 @@ LINUX_TMPL = """\
 {{- if (eq .chezmoi.os "linux") -}}
 #!/usr/bin/env bash
 LAZYGIT_VERSION="0.58.0"
-RUSTUP_VERSION="1.28.0"
-RUSTUP_INIT_SHA256_X86_64="0000000000000000000000000000000000000000000000000000000000000000"
-RUSTUP_INIT_SHA256_AARCH64="1111111111111111111111111111111111111111111111111111111111111111"
+DELTA_VERSION="0.18.0"
+DELTA_SHA256_X86_64="2222222222222222222222222222222222222222222222222222222222222222"
+DELTA_SHA256_AARCH64="3333333333333333333333333333333333333333333333333333333333333333"
+NAVI_VERSION="2.23.0"
+NAVI_SHA256_X86_64="4444444444444444444444444444444444444444444444444444444444444444"
+NAVI_SHA256_AARCH64="5555555555555555555555555555555555555555555555555555555555555555"
+TREE_SITTER_VERSION="0.26.0"
+TREE_SITTER_SHA256_X86_64="6666666666666666666666666666666666666666666666666666666666666666"
+TREE_SITTER_SHA256_AARCH64="7777777777777777777777777777777777777777777777777777777777777777"
 EZA_KEY_FPR="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 CHARM_KEY_FPR="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 {{- end -}}
@@ -140,9 +146,8 @@ CHARM_KEY_FPR="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 # Read back out of the fixture rather than restated beside it: a test that wants
 # to say "the version the fixture pins" should not be able to disagree with the
 # fixture, and 64-character literals repeated in two files drift silently.
-RUSTUP_VERSION_PIN = re.search(r'RUSTUP_VERSION="([^"]+)"', LINUX_TMPL).group(1)
-RUSTUP_X86_SHA = re.search(r'RUSTUP_INIT_SHA256_X86_64="([0-9a-f]+)"', LINUX_TMPL).group(1)
-RUSTUP_ARM_SHA = re.search(r'RUSTUP_INIT_SHA256_AARCH64="([0-9a-f]+)"', LINUX_TMPL).group(1)
+DELTA_X86_SHA = re.search(r'DELTA_SHA256_X86_64="([0-9a-f]+)"', LINUX_TMPL).group(1)
+DELTA_ARM_SHA = re.search(r'DELTA_SHA256_AARCH64="([0-9a-f]+)"', LINUX_TMPL).group(1)
 
 EXTERNALS_YAML = """\
 # Upstream code fetched by chezmoi. Every entry is pinned and checksummed.
