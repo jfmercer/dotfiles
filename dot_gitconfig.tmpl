@@ -77,15 +77,18 @@
 # Off on work machines (employer signing policy is theirs to set) and on
 # Linux, where op-ssh-sign at this path does not exist -- with gpgsign on,
 # a missing signer makes every commit fail rather than go unsigned.
-# The key below is the public half; the private key never leaves 1Password.
+# The key (from .chezmoidata.yaml) is the public half; the private key never
+# leaves 1Password.
 [user]
-    signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH6ZF+VE+EbdxAjtPh1b1YYs4EGmcnME4qSs1nc1PT9S
+    signingkey = {{ .signing_key }}
 
 [gpg]
     format = ssh
 
 [gpg "ssh"]
     program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+    # Lets `git log --show-signature` verify; without it git reports "No signature".
+    allowedSignersFile = ~/.config/git/allowed_signers
 
 [commit]
     gpgsign = true

@@ -48,3 +48,11 @@ terminal/
 # only guaranteed effect is to stop an accidentally-added lockfile from being
 # applied over yours.
 .config/nvim/lazy-lock.json
+
+# Only where dot_gitconfig.tmpl's signing block points at it: personal Macs.
+# This guard is the exact negation of that one -- keep the two in step, or a
+# machine gets an allowed_signers file nothing reads, or a gitconfig pointing
+# at a file that does not exist.
+{{- if or (ne .chezmoi.os "darwin") (get . "work") }}
+.config/git/allowed_signers
+{{- end }}
