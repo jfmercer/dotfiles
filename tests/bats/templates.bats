@@ -139,6 +139,52 @@ write_config() {
     assert_output_contains "email = a@b.c"
 }
 
+# ------------------------------------------------- SSH commit signing
+
+# The signing block is guarded on darwin && !work, and .chezmoiignore carries the
+# exact negation for allowed_signers. .chezmoi.os cannot be overridden from a
+# config file, so these assert agreement on whichever OS runs them -- CI covers
+# both -- rather than hardcoding which side of the guard this runner is on.
+
+@test "allowed_signers names the same key the gitconfig signs with" {
+    # Both read .signing_key from .chezmoidata.yaml. Should either ever go back to
+    # a literal, a rotation that updates one copy leaves commits signed but
+    # reported as untrusted -- nothing fails, so nothing else would notice.
+    write_config "$BATS_TEST_TMPDIR/home.yaml" 'email: "a@b.c"' 'work: false'
+    signers=$(render_with "$BATS_TEST_TMPDIR/home.yaml" \
+        "$REPO_ROOT/dot_config/git/allowed_signers.tmpl")
+    key=$("${CM[@]}" execute-template --config "$BATS_TEST_TMPDIR/home.yaml" \
+        '{{ .signing_key }}')
+
+    [ -n "$key" ]
+    [ "$signers" = "a@b.c $key" ]
+    if [ "$(uname)" = Darwin ]; then
+        run render_with "$BATS_TEST_TMPDIR/home.yaml" "$REPO_ROOT/dot_gitconfig.tmpl"
+        assert_output_contains "signingkey = $key"
+    fi
+}
+
+@test "allowed_signers is applied exactly where the gitconfig points at it" {
+    for work in true false; do
+        write_config "$BATS_TEST_TMPDIR/c.yaml" 'email: "a@b.c"' "work: $work"
+        gitconfig=$(render_with "$BATS_TEST_TMPDIR/c.yaml" "$REPO_ROOT/dot_gitconfig.tmpl")
+        ignore=$(render_with "$BATS_TEST_TMPDIR/c.yaml" "$REPO_ROOT/.chezmoiignore")
+
+        if grep -q 'allowedSignersFile' <<<"$gitconfig"; then pointed=1; else pointed=0; fi
+        if grep -qx '\.config/git/allowed_signers' <<<"$ignore"; then ignored=1; else ignored=0; fi
+
+        if [ "$pointed" = "$ignored" ]; then
+            printf 'work=%s: gitconfig points at allowed_signers=%s, but it is ignored=%s\n' \
+                "$work" "$pointed" "$ignored" >&2
+            return 1
+        fi
+        if [ "$work" = true ] && [ "$pointed" = 1 ]; then
+            echo "work machine got the signing block" >&2
+            return 1
+        fi
+    done
+}
+
 # ------------------------------------------------------- homebrew template
 
 HOMEBREW_TMPL=".chezmoiscripts/darwin/run_onchange_before_10_homebrew.sh.tmpl"

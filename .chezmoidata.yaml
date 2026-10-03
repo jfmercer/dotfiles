@@ -1,0 +1,9 @@
+# Static template data, read by chezmoi on every apply. Unlike the prompted
+# values in .chezmoi.yaml.tmpl, nothing here needs `chezmoi init` re-run.
+
+# Public half of the 1Password SSH key that signs commits on personal Macs. It is
+# read by both dot_gitconfig.tmpl (user.signingkey) and
+# dot_config/git/allowed_signers.tmpl (verification), so a rotation is one edit
+# here rather than two that can drift apart -- a mismatch would not fail
+# signing, only make every new commit show as untrusted.
+signing_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH6ZF+VE+EbdxAjtPh1b1YYs4EGmcnME4qSs1nc1PT9S
