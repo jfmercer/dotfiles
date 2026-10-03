@@ -71,6 +71,25 @@
     default = simple
     # Auto-create the upstream branch on first push (Git 2.37+)
     autoSetupRemote = true
+{{- if and (eq .chezmoi.os "darwin") (not (get . "work")) }}
+
+# Personal Macs only: sign commits with the SSH key held in 1Password.
+# Off on work machines (employer signing policy is theirs to set) and on
+# Linux, where op-ssh-sign at this path does not exist -- with gpgsign on,
+# a missing signer makes every commit fail rather than go unsigned.
+# The key below is the public half; the private key never leaves 1Password.
+[user]
+    signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH6ZF+VE+EbdxAjtPh1b1YYs4EGmcnME4qSs1nc1PT9S
+
+[gpg]
+    format = ssh
+
+[gpg "ssh"]
+    program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+
+[commit]
+    gpgsign = true
+{{- end }}
 {{- if get . "work" }}
 
 # Work machines only. Personal machines keep git's built-in default (master),
