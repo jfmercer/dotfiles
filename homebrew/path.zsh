@@ -15,3 +15,9 @@
 if [[ -x /opt/homebrew/bin/brew ]]; then
   cached-eval brew-shellenv /opt/homebrew/bin/brew shellenv
 fi
+
+# asdf shims must win over Homebrew. asdf/exports.zsh prepends them, but that pass
+# runs before every path.zsh, and `brew shellenv` unconditionally prepends /opt/homebrew/bin
+# -- so Homebrew's node, python etc. shadowed the version asdf selects. Hoist the
+# shims back to the front now that Homebrew is on PATH.
+path=(${ASDF_DATA_DIR:-$HOME/.asdf}/shims ${path:#${ASDF_DATA_DIR:-$HOME/.asdf}/shims})

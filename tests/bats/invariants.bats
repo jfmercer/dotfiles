@@ -90,6 +90,23 @@ load helpers/stub.bash
     done
 }
 
+@test "asdf shims precede /opt/homebrew/bin on PATH after the path.zsh pass" {
+    # brew shellenv prepends /opt/homebrew/bin, and homebrew/ sorts after asdf/, so
+    # without homebrew/path.zsh hoisting the shims they land behind Homebrew's
+    # binaries and asdf's selected versions are silently shadowed.
+    command -v zsh >/dev/null || skip "zsh not installed"
+    # cached-eval is stubbed to do what `brew shellenv` does to PATH, so this holds
+    # whether or not Homebrew is installed on the machine running the test.
+    run zsh -f -c '
+        cached-eval() { export PATH="/opt/homebrew/bin:$PATH"; }
+        export ASDF_DATA_DIR=/fake/asdf PATH=/usr/bin:/bin
+        source "$1/asdf/exports.zsh"
+        source "$1/homebrew/path.zsh"
+        print -r -- "${path[1]}"
+    ' _ "$REPO_ROOT"
+    [ "$output" = "/fake/asdf/shims" ]
+}
+
 # --------------------------------------------------------- zsh cache location
 
 @test "the zsh cache directory matches in dot_zshrc and zsh/completion.zsh" {
