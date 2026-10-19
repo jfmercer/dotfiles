@@ -36,7 +36,7 @@ error() {
 # serve an honest installer -- that is unavoidable for a bootstrap -- but pinning
 # means a compromised endpoint cannot silently hand us a different chezmoi than
 # the one this repo was tested against. Bump with: chezmoi --version
-CHEZMOI_VERSION="v2.72.2"
+CHEZMOI_VERSION="v2.73.2"
 
 # POSIX way to get script's dir: https://stackoverflow.com/a/29834779/12156188
 # shellcheck disable=SC2312
