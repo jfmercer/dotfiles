@@ -174,7 +174,7 @@ jobs:
       # `v` prefix upstream.
       - name: Install ruff
         env:
-          RUFF_VERSION: 0.16.9
+          RUFF_VERSION: 0.17.1
         run: |
           case "$RUNNER_OS-$(uname -m)" in
             macOS-arm64)   target=aarch64-apple-darwin ;;
@@ -281,7 +281,7 @@ jobs:
 
       - name: Install zizmor
         env:
-          ZIZMOR_VERSION: v1.30.1
+          ZIZMOR_VERSION: v1.31.1
         run: |
           url="https://github.com/zizmorcore/zizmor/releases/download/${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/zizmor.tar.gz "$url"
