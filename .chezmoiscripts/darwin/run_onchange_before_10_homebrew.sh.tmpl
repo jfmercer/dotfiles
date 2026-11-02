@@ -25,6 +25,12 @@ export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications --require-sha"
 # about matching interactive behavior.
 export HOMEBREW_CURL_RETRIES=3
 
+# `brew bundle` never refreshes Homebrew's formula/cask index, so a package
+# newer than the local index is "unavailable: No Cask with this name exists".
+# This script only runs when the list below changes -- exactly when an entry may
+# be newer than the index (herdr-app's cask postdated CI's runner image).
+brew update --quiet
+
 {{ $brews := list
      "asdf"
      "atuin"
