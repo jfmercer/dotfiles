@@ -198,8 +198,9 @@ nnoremap <silent> <leader>sv :so $MYVIMRC<cr>  " 's'ource 'v'imrc
 cnoremap <expr> %% getcmdtype() == ':' ? expand('%:h').'/' : '%%'
 
 " Function Keys
-set pastetoggle=<F2>                " Toggle paste function for clipboard pasting
-nnoremap <F3> :NERDTreeToggle<CR>   " Toggle NERDTree
+set pastetoggle=<F4>                " Toggle paste function for clipboard pasting (F2 is Herdr's tab.rename)
+" Toggle NERDTree (comment on its own line: a trailing \" in a map becomes part of the mapping)
+nnoremap <F3> :NERDTreeToggle<CR>
 
 " Disable Arrow Keys
 inoremap  <Up>     <NOP>
