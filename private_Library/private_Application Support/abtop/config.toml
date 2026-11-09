@@ -1,0 +1,4 @@
+# abtop reads this via Rust's dirs::config_dir(), which on macOS is
+# ~/Library/Application Support -- not the ~/.config/abtop its README says.
+# Pressing `t` in abtop rewrites the theme line here; `chezmoi apply` reverts it.
+theme = "catppuccin"

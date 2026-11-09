@@ -49,6 +49,11 @@ terminal/
 # applied over yours.
 .config/nvim/lazy-lock.json
 
+# abtop's config is the only thing under ~/Library; it is macOS-only.
+{{- if ne .chezmoi.os "darwin" }}
+Library/
+{{- end }}
+
 # Only where dot_gitconfig.tmpl's signing block points at it: personal Macs.
 # This guard is the exact negation of that one -- keep the two in step, or a
 # machine gets an allowed_signers file nothing reads, or a gitconfig pointing
