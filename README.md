@@ -67,7 +67,7 @@ nvim does not read `~/.vimrc`, and `~/.vim` is not on its `runtimepath`.
 #### Key Mappings
 
 * `ESC` is now `jk`. This will save your left pinky from a premature death.
-* `F2` toggles paste.
+* `F4` toggles paste.
 * `F3` toggles NERDTree.
 * `,ev` edits your vimrc. The mnemonic is 'e'dit 'v'imrc.
 * `,sv` sources your vimrc. The mnemonic is 's'ource 'v'imrc.
