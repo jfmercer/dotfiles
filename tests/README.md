@@ -74,10 +74,12 @@ the code where a bug is either invisible or dangerous:
   The `ACTION` pin class gets disproportionate coverage for its size, because two
   of its failure modes are silent. A pin rewritten in `ci.yaml` but not
   `deps.yaml` leaves the tree inconsistent while `--check` still reports
-  "current"; and a commit updated without its `# vX.Y.Z` comment leaves the
-  comment lying about what actually runs. Both are invisible in a diff review,
-  so `fixture_repo` carries **both** workflow files and the tests assert across
-  them.
+  "current"; and a tag rewritten without regenerating
+  `.github/workflows/actions.lock` leaves a diff that looks complete and a tree
+  the runner rejects. So `fixture_repo` carries **both** workflow files *and* a
+  lockfile, and the tests assert across all three. `relock()` itself shells out
+  to `gh actions-lock` and is stubbed; what is tested is that `--apply` calls it
+  exactly once and fails loudly when the extension is missing.
 
   One test here reads the **real** `.github/workflows/deps.yaml` rather than a
   fixture. That workflow greps `--check`'s output to decide between opening a
@@ -163,13 +165,14 @@ put it back:
 | `.chezmoiversion` → `2.99.0` | `test_floor_above_...`, and an invariants test |
 | remove `bin/` from `.chezmoiignore` | `invariants.bats` |
 | edit `HOMEBREW_CASK_OPTS` in `homebrew/exports.zsh` only | `templates.bats` |
-| revert any `actions/checkout` pin in `ci.yaml` to `@v7.0.1` | `test_the_real_repo_satisfies_its_own_invariants` |
-| change the `# v7.0.1` comment beside a checkout SHA to `# v6.0.0` | `bump-deps --check`, and zizmor's `ref-version-mismatch` in CI |
-| drop `deps.yaml` from `ACTION_PINS`'s `files` | `test_the_second_workflow_is_checked_too` |
+| revert any `actions/checkout` pin in `ci.yaml` to an inline `@<sha> # v7.0.1` | `test_the_real_repo_satisfies_its_own_invariants` |
+| change a `uses:` tag in `deps.yaml` without re-running `gh actions-lock` | the same test, and `gh actions-lock --verify` in the `workflows` job |
+| drop `deps.yaml` from `ACTION_PINS`'s `files` | `test_rewrites_the_tag`, `test_spans_every_file_in_the_pin`, and the real-repo invariants test |
+| drop the lockfile-coverage branch from `check_invariants()` | `test_a_tag_edited_without_relocking_is_caught`, `test_a_new_workflow_outside_the_lockfile_is_caught` |
 | drop `unverifiable` from `deps.yaml`'s manual-class grep | `test_the_deps_workflow_routes_every_status_it_can_see` |
 | add a status to `gather()` without teaching `deps.yaml` about it | the same test |
 | re-sync `dot_config/nvim/lua/config/{options,keymaps}.lua` from the LazyVim starter | the LazyVim customizations invariant |
 | `chezmoi add ~/.config/nvim/lazy-lock.json` | the lazy.nvim lockfile invariant |
 | add a `*_KEY_FPR` to the linux installs script without registering it in `ANCHOR_PINS` | `test_an_unregistered_key_fingerprint_is_caught`, and `bump-deps --check` |
-| `replace_action_pin`: stop rewriting `m.group(2)` | `bump-deps --self-test`, and 2 `ReplaceActionPin` tests |
+| `apply_actions`: drop the `relock()` call | `test_two_bumps_relock_once`, `test_a_missing_extension_is_a_problem_not_a_silent_skip` |
 | correct `tests/fixtures/zizmor/canary.yml`'s version comment | the `workflows` job's canary step (CI only) |

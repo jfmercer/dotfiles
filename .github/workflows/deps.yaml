@@ -44,10 +44,9 @@ jobs:
       # this job never needs contents: write or pull-requests: write.
       issues: write
     steps:
-      # Pinned to a commit, not the v7.0.1 tag, for the reason .chezmoiexternal.yaml
-      # gives: a tag can be force-moved, a commit cannot. The hash is also what
-      # lets zizmor check this pin's provenance at all -- see CLAUDE.md.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Locked to a commit by .github/workflows/actions.lock, not by this tag --
+      # see the matching comment in ci.yaml.
+      - uses: actions/checkout@v7.0.1
         with:
           # Don't leave the token in .git/config after checkout. The push below
           # authenticates through a credential helper instead.
@@ -185,6 +184,19 @@ jobs:
             echo "nothing for a human, no open issue"
           fi
 
+      # An ACTION bump rewrites a `uses:` tag and then has to relock, or the PR
+      # fails CI's lockfile gate: bump-deps runs `gh actions-lock` for that and
+      # aborts if the extension is missing. Same pin as ci.yaml; bump-deps keeps
+      # the two in step.
+      - name: Install gh-actions-lock
+        if: steps.check.outputs.bumpable == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTIONS_LOCK_VERSION: v0.4.1
+        run: |
+          scripts/retry.sh 5 gh extension install github/gh-actions-lock --pin "$GH_ACTIONS_LOCK_VERSION"
+          gh actions-lock --version
+
       - name: Bump the pins
         id: bump
         if: steps.check.outputs.bumpable == 'true'
@@ -239,7 +251,7 @@ jobs:
           # so a PR opened with it arrives with no checks at all. On a bump that
           # is the whole review -- CI is what catches an external whose checksum
           # does not match what upstream now serves (the `apply` job) or an
-          # action SHA zizmor rejects (the `workflows` job).
+          # action whose lockfile entry does not verify (the `workflows` job).
           #
           # A fine-grained PAT scoped to this repository alone, needing three
           # permissions and no more:
