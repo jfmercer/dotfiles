@@ -14,11 +14,13 @@ fingerprint, for instance, would defeat the entire reason it is pinned.
            pure function of the version, because the URL they cover embeds it.
            Those are not separate pins -- they are derived, so they are
            recomputed and rewritten in the same operation as the version, for
-           the reason ACTION moves its comment with its SHA.
-  ACTION   A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment
-           beside it. Both halves move together: the SHA is what actually runs,
-           the comment is what a human reads, and a comment that disagrees with
-           its SHA is worse than no comment at all. Fully automatic.
+           the reason ACTION relocks in the same run as it retags.
+  ACTION   A GitHub Action referenced by an exact `vX.Y.Z` tag, locked to a
+           commit by .github/workflows/actions.lock. Bumping rewrites the tag in
+           every workflow and then regenerates the lockfile with `gh
+           actions-lock`, in the same run: the tag is what a human reads, the
+           lockfile is what runs, and a tag bumped without a relock is a tree
+           CI rejects. Fully automatic. Needs the gh-actions-lock extension.
   EXTERNAL A commit SHA plus a sha256 in .chezmoiexternal.yaml. Bumping moves to
            current master and recomputes the checksum, which means pulling
            upstream code nobody has read -- so each one is confirmed
@@ -47,7 +49,8 @@ Usage:
   bump-deps --self-test        Prove the in-place editing rewrites only what it
                                should, then restore every file
 
-Requires: gh (authenticated), python3. No pip dependencies.
+Requires: gh (authenticated), python3. No pip dependencies. --apply on an
+ACTION pin also needs `gh extension install github/gh-actions-lock`.
 """
 
 from __future__ import annotations
@@ -65,6 +68,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CI = ".github/workflows/ci.yaml"
 DEPS = ".github/workflows/deps.yaml"
+WORKFLOWS = ".github/workflows"
+LOCKFILE = ".github/workflows/actions.lock"
 LINUX = ".chezmoiscripts/linux/run_onchange_before_10_installs.sh.tmpl"
 EXTERNALS = ".chezmoiexternal.yaml"
 INSTALL = "install.sh"
@@ -142,6 +147,27 @@ VERSION_PINS = [
         "file": CI,
         "pattern": r"RUFF_VERSION: (\S+)",
         "repo": "astral-sh/ruff",
+        "occurrences": 1,
+        "strip_v": False,
+    },
+    {
+        # The gh extension that verifies (ci.yaml) and regenerates (deps.yaml)
+        # .github/workflows/actions.lock. Two entries rather than one because a
+        # VERSION pin names a single file; check_invariants() requires that they
+        # agree, since a lockfile written by one version and verified by another
+        # is a failure nobody would think to look for.
+        "name": "gh-actions-lock",
+        "file": CI,
+        "pattern": r"GH_ACTIONS_LOCK_VERSION: (\S+)",
+        "repo": "github/gh-actions-lock",
+        "occurrences": 1,
+        "strip_v": False,
+    },
+    {
+        "name": "gh-actions-lock-deps",
+        "file": DEPS,
+        "pattern": r"GH_ACTIONS_LOCK_VERSION: (\S+)",
+        "repo": "github/gh-actions-lock",
         "occurrences": 1,
         "strip_v": False,
     },
@@ -226,35 +252,35 @@ VERSION_PINS = [
 ]
 
 # --------------------------------------------------------------------------
-# Actions are pinned to a commit, not a tag. A tag can be force-moved by anyone
-# able to push to the action's repo; a commit is content-addressed. The same
-# argument .chezmoiexternal.yaml makes for zsh plugins applies with more force
-# here, because these run with a GITHUB_TOKEN.
+# Actions are referenced by an exact release tag and locked to a commit by
+# .github/workflows/actions.lock, which `gh actions-lock` generates. A tag can be
+# force-moved by anyone able to push to the action's repo, which is why these
+# used to be inline commit SHAs; the lockfile gives the same guarantee one level
+# down -- the runner executes the locked commit, and rejects a run whose tag has
+# moved or whose repository is no longer the one locked (by numeric ID, which a
+# rename or a re-registered name cannot fake).
 #
-# The hash is also what makes the pin auditable: zizmor's impostor-commit,
-# ref-version-mismatch and stale-action-refs audits have nothing to inspect on a
-# tag pin. ref-version-mismatch in particular checks the `# vX.Y.Z` comment
-# against the commit, which is why this class rewrites both together rather than
-# leaving the comment to rot into a lie.
+# The tag must be exact (vX.Y.Z), not a floating major: that is what this class
+# compares against the latest release, and what makes a moved tag an error at
+# run time rather than a warning.
 #
 #   files    a list, not a single path: actions/checkout is used by both
 #            workflows, and rewriting one file while leaving the other behind
 #            would leave the tree inconsistent while still reporting "current".
-#   pattern  exactly two capture groups, (commit, version comment), in that
-#            order. This is why ACTION pins use replace_action_pin() instead of
-#            replace_value(), whose contract is a single group.
+#   pattern  one capture group, the tag. Anchored on the right so v7.0.1 cannot
+#            match the front of a longer ref.
 # --------------------------------------------------------------------------
 ACTION_PINS = [
     {
         "name": "actions/checkout",
         "files": [CI, DEPS],
-        "pattern": r"actions/checkout@([0-9a-f]{40}) # (v?\d+\.\d+\.\d+)",
+        "pattern": r"actions/checkout@(v?\d+\.\d+\.\d+)(?![\w.])",
         "repo": "actions/checkout",
     },
     {
         "name": "gitleaks-action",
         "files": [CI],
-        "pattern": r"gitleaks/gitleaks-action@([0-9a-f]{40}) # (v?\d+\.\d+\.\d+)",
+        "pattern": r"gitleaks/gitleaks-action@(v?\d+\.\d+\.\d+)(?![\w.])",
         "repo": "gitleaks/gitleaks-action",
     },
 ]
@@ -332,24 +358,6 @@ def latest_release(repo: str) -> str:
 
 def head_sha(repo: str) -> str:
     return gh_text(f"repos/{repo}/commits/HEAD", "--jq", ".sha")
-
-
-def tag_commit(repo: str, tag: str) -> str:
-    """Resolve a tag to the commit it points at.
-
-    Both actions pinned here use lightweight tags today, where the ref's object
-    *is* the commit. Annotated tags point at a tag object instead, which has to
-    be dereferenced -- handled rather than assumed, because whether a project
-    signs its release tags is upstream's choice to change, and getting this wrong
-    would pin a tag object's SHA that no checkout could ever resolve.
-    """
-    kind = gh_text(f"repos/{repo}/git/ref/tags/{tag}", "--jq", ".object.type")
-    sha = gh_text(f"repos/{repo}/git/ref/tags/{tag}", "--jq", ".object.sha")
-    if kind == "tag":
-        sha = gh_text(f"repos/{repo}/git/tags/{sha}", "--jq", ".object.sha")
-    if not re.fullmatch(r"[0-9a-f]{40}", sha):
-        raise Problem(f"{repo}: {tag} resolved to {sha!r}, not a commit SHA")
-    return sha
 
 
 def commit_date(repo: str, sha: str) -> str:
@@ -467,14 +475,14 @@ def replace_value(pin: dict, old: str, new: str) -> int:
     return n
 
 
-def current_action_pin(pin: dict) -> tuple[str, str]:
-    """Return (commit, version comment) for an ACTION pin, across all its files.
+def current_action_pin(pin: dict) -> str:
+    """Return the tag an ACTION pin references, across all its files.
 
     Every occurrence in every file must agree. A tree where one workflow pins a
-    different commit than another is exactly the drift this class exists to
+    different version than another is exactly the drift this class exists to
     prevent, so it aborts rather than picking one and rewriting the rest.
     """
-    found: list[tuple[str, str]] = []
+    found: list[str] = []
     for rel in pin["files"]:
         hits = re.findall(pin["pattern"], read(rel))
         if not hits:
@@ -485,13 +493,13 @@ def current_action_pin(pin: dict) -> tuple[str, str]:
     return found[0]
 
 
-def replace_action_pin(pin: dict, new_sha: str, new_tag: str) -> int:
-    """Rewrite an ACTION pin's commit and version comment together.
+def replace_action_pin(pin: dict, new_tag: str) -> int:
+    """Rewrite an ACTION pin's tag in every one of its files.
 
-    Deliberately not replace_value(): that rebuilds the match around a single
-    capture group, and splitting this into two passes would leave the file
-    momentarily holding a SHA whose comment disagrees -- the precise state
-    zizmor's ref-version-mismatch audit exists to catch.
+    Only the workflows: the lockfile is regenerated afterwards by relock(),
+    never edited here. It is machine-generated and carries upstream's numeric
+    owner/repo IDs, which a hand-rolled rewrite would have to fetch and could
+    get wrong in ways the runner, not this script, would be the first to notice.
     """
     pattern = re.compile(pin["pattern"])
     total = 0
@@ -499,12 +507,10 @@ def replace_action_pin(pin: dict, new_sha: str, new_tag: str) -> int:
         text = read(rel)
 
         def sub(m: re.Match) -> str:
+            s = m.start(1) - m.start(0)
+            e = m.end(1) - m.start(0)
             whole = m.group(0)
-            whole = whole.replace(m.group(1), new_sha, 1)
-            # Replace the comment last and anchor on the tail, so a version
-            # string that happens to occur inside the SHA cannot be hit.
-            head, sep, tail = whole.rpartition(m.group(2))
-            return head + new_tag + tail if sep else whole
+            return whole[:s] + new_tag + whole[e:]
 
         updated, n = pattern.subn(sub, text)
         if n:
@@ -513,6 +519,91 @@ def replace_action_pin(pin: dict, new_sha: str, new_tag: str) -> int:
     if total == 0:
         raise Problem(f"{pin['name']}: nothing replaced in {pin['files']}")
     return total
+
+
+def workflow_files() -> list[str]:
+    """Every workflow under .github/workflows/, relative to REPO, sorted."""
+    d = path(WORKFLOWS)
+    if not os.path.isdir(d):
+        return []
+    return sorted(
+        f"{WORKFLOWS}/{f}" for f in os.listdir(d) if f.endswith((".yml", ".yaml"))
+    )
+
+
+def locked_refs() -> dict[str, set[str]]:
+    """Map each workflow in the lockfile to the `owner/repo@ref`s locked for it.
+
+    Line-oriented, like parse_externals(), and for the same reason: no YAML
+    library. The format is machine-generated and fixed-indent, so this reads
+    only the `workflows:` block -- the half that says which workflow is covered
+    by what. Whether each locked commit is still valid upstream is not this
+    script's question; `gh actions-lock --verify` answers it in CI.
+    """
+    if not os.path.exists(path(LOCKFILE)):
+        return {}
+    out: dict[str, set[str]] = {}
+    section, current = "", None
+    for line in read(LOCKFILE).splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith(" "):
+            section = line.split(":", 1)[0].strip()
+            continue
+        if section != "workflows":
+            continue
+        m = re.fullmatch(r"\s+'([^']+)':", line)
+        if m:
+            current = m.group(1)
+            out[current] = set()
+            continue
+        m = re.fullmatch(r"\s+- '([^']+)'", line)
+        if m and current is not None:
+            out[current].add(m.group(1))
+    return out
+
+
+def locked_commit(repo: str, tag: str) -> str:
+    """The commit actions.lock records for repo@tag, or "" if it has none."""
+    if not os.path.exists(path(LOCKFILE)):
+        return ""
+    m = re.search(
+        rf"^\s+'{re.escape(repo)}@{re.escape(tag)}':\n(?:\s+\w+: .*\n)*?\s+commit: 'sha1-([0-9a-f]{{40}})'",
+        read(LOCKFILE),
+        re.M,
+    )
+    return m.group(1) if m else ""
+
+
+def relock() -> None:
+    """Regenerate actions.lock after an ACTION tag rewrite.
+
+    --no-onboard: in automation this may only re-pin workflows that are already
+    locked, never take on a new one -- onboarding is a decision a human makes
+    by running `gh actions-lock` themselves. Not --accept-moved, which GitHub's
+    docs say never to use unattended: it would silently accept a rewritten tag.
+    """
+    if not shutil.which("gh"):
+        raise Problem("gh is not on PATH; cannot regenerate the actions lockfile")
+    probe = subprocess.run(
+        ["gh", "actions-lock", "--version"], capture_output=True, text=True, check=False
+    )
+    if probe.returncode != 0:
+        raise Problem(
+            "the gh-actions-lock extension is not installed, so the workflows now "
+            "reference tags their lockfile does not cover. Install it with "
+            "`gh extension install github/gh-actions-lock` and re-run, or revert."
+        )
+    r = subprocess.run(
+        ["gh", "actions-lock", "--no-interactive", "--no-onboard"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=REPO,
+    )
+    if r.returncode != 0:
+        raise Problem(f"gh actions-lock failed:\n{r.stdout}{r.stderr}")
+    print("    relocked .github/workflows/actions.lock")
 
 
 # --------------------------------------------------------- externals parsing
@@ -621,33 +712,73 @@ def check_invariants() -> list[str]:
     if "master.tar.gz" in text or "/HEAD/" in text:
         problems.append(f"{EXTERNALS}: an entry is tracking a moving ref instead of a pin")
 
-    # 3. Actions must be pinned to a commit with a matching version comment.
-    #    This used to demand the opposite -- an exact vX.Y.Z tag, rejecting a SHA
-    #    as a "floating tag". That had it backwards: a tag can be force-moved, and
-    #    a tag pin gives zizmor nothing to audit. See ACTION_PINS.
+    # 3. Every action in every workflow must be a registered ACTION pin, on an
+    #    exact vX.Y.Z tag, and locked for that workflow in actions.lock.
+    #
+    #    Walked from the workflows outwards, not from ACTION_PINS: walking the
+    #    registry could only ever check what is already registered, so a new
+    #    action -- or a new workflow -- would be neither bumped nor reported.
+    #    And every `uses:` line is judged on its own, because one correct pin in
+    #    a file says nothing about the other five.
+    #
+    #    The lockfile half is the offline part of `gh actions-lock --verify`:
+    #    coverage, not trust. It is here so --check can say "you edited a
+    #    workflow and forgot to relock" without the extension installed.
+    locked = locked_refs()
+    if not os.path.exists(path(LOCKFILE)):
+        problems.append(
+            f"{LOCKFILE} is missing, so no action is locked to a commit; "
+            "run `gh actions-lock`"
+        )
+    by_repo = {p["repo"]: p for p in ACTION_PINS}
+    for rel in workflow_files():
+        text = read(rel)
+        for m in re.finditer(r"^[ \t]*-?[ \t]*uses:[ \t]*(\S+)", text, re.M):
+            ref = m.group(1).strip("'\"")
+            # Same-repo and container references are not GitHub Action pins.
+            if ref.startswith(("./", "$/", "docker://")) or "@" not in ref:
+                continue
+            action, version = ref.split("@", 1)
+            repo = "/".join(action.split("/")[:2])
+            pin = by_repo.get(repo)
+            if pin is None:
+                problems.append(
+                    f"{rel}: '{ref}' is not registered in bump-deps' ACTION_PINS, "
+                    "so nothing would ever report it stale"
+                )
+                continue
+            if rel not in pin["files"]:
+                problems.append(
+                    f"{rel}: uses {pin['name']} but ACTION_PINS lists only "
+                    f"{pin['files']} for it -- --apply would bump the others and "
+                    "leave this one behind"
+                )
+            end = text.find("\n", m.end())
+            line = text[m.start() : end if end != -1 else len(text)]
+            if not re.search(pin["pattern"], line):
+                problems.append(
+                    f"{rel}: {pin['name']} is pinned to '{version}'; use an exact "
+                    "vX.Y.Z release tag and let actions.lock carry the commit"
+                )
+            elif os.path.exists(path(LOCKFILE)) and ref not in locked.get(rel, set()):
+                problems.append(
+                    f"{rel}: '{ref}' is not in {LOCKFILE}; run `gh actions-lock`"
+                )
     for pin in ACTION_PINS:
         for rel in pin["files"]:
-            text = read(rel)
-            # Every `uses:` of this action must be well-formed, not merely one of
-            # them. Searching the file as a whole would report a clean tree as
-            # long as a single correct pin existed somewhere in it, so reverting
-            # one of six checkouts to a tag would pass unnoticed.
-            seen = False
-            for m in re.finditer(r"^[ \t]*-?[ \t]*uses:[ \t]*(\S+)", text, re.M):
-                if not m.group(1).startswith(pin["repo"] + "@"):
-                    continue
-                seen = True
-                end = text.find("\n", m.end())
-                line = text[m.start() : end if end != -1 else len(text)]
-                if not re.search(pin["pattern"], line):
-                    ref = m.group(1).split("@", 1)[1]
-                    problems.append(
-                        f"{rel}: {pin['name']} is pinned to '{ref}'; use a "
-                        "40-character commit SHA with a '# vX.Y.Z' comment beside "
-                        "it, so the pin is immutable and auditable"
-                    )
-            if not seen:
+            if not re.search(pin["pattern"], read(rel)):
                 problems.append(f"{rel}: {pin['name']} pin not found")
+
+    # 3b. The extension that verifies the lockfile and the one that writes it
+    #     must be the same version, or a format change between them surfaces as
+    #     a red PR whose diff looks fine.
+    lock_versions = {
+        p["file"]: current_value(p) for p in VERSION_PINS if p["repo"] == "github/gh-actions-lock"
+    }
+    if len(set(lock_versions.values())) > 1:
+        problems.append(
+            f"gh-actions-lock is pinned to different versions: {lock_versions}"
+        )
 
     # 4. Every GPG fingerprint in the install script must be a registered ANCHOR.
     #    The fingerprint in the script only stops a bad key at install time; it is
@@ -724,20 +855,20 @@ def gather(only: set[str]) -> list[Row]:
     for pin in ACTION_PINS:
         if only and pin["name"] not in only:
             continue
-        cur_sha, cur_tag = current_action_pin(pin)
+        cur_tag = current_action_pin(pin)
         tag = latest_release(pin["repo"])
-        sha = tag_commit(pin["repo"], tag)
-        # Compare on the commit, not the comment: the SHA is what runs. A pin
-        # whose comment is stale but whose commit is current is still wrong, and
-        # showing the tag in `detail` is what makes that legible in the table.
+        # The locked commit is shown, not compared: whether it still matches
+        # what the tag points to upstream is `gh actions-lock --verify`'s
+        # question, and a moved tag is a trust event, not a staleness one.
+        locked = locked_commit(pin["repo"], cur_tag)
         rows.append(
             Row(
                 pin["name"],
                 "ACTION",
-                cur_sha[:12],
-                sha[:12],
-                "current" if (cur_sha, cur_tag) == (sha, tag) else "stale",
-                f"{cur_tag} -> {tag}" if cur_tag != tag else cur_tag,
+                cur_tag,
+                tag,
+                "current" if cur_tag == tag else "stale",
+                f"locked {locked[:12]}" if locked else "not locked",
             )
         )
 
@@ -859,13 +990,15 @@ def apply_actions(rows: list[Row], dry: bool) -> int:
         row = next((r for r in rows if r.name == pin["name"] and r.klass == "ACTION"), None)
         if row is None or not row.actionable:
             continue
-        tag = latest_release(pin["repo"])
-        sha = tag_commit(pin["repo"], tag)
-        print(f"  {pin['name']}: {row.current}... -> {sha[:12]}... ({tag})")
+        print(f"  {pin['name']}: {row.current} -> {row.latest}")
         if not dry:
-            n = replace_action_pin(pin, sha, tag)
+            n = replace_action_pin(pin, row.latest)
             print(f"    {', '.join(pin['files'])} ({n} occurrence(s))")
         changed += 1
+    # Once, after every tag has moved: the lockfile describes all workflows at
+    # once, and relocking between pins would only lock intermediate states.
+    if changed and not dry:
+        relock()
     return changed
 
 
@@ -927,19 +1060,19 @@ def verify_externals() -> bool:
 
 
 def self_test_actions() -> int:
-    """Prove replace_action_pin rewrites both halves of an ACTION pin, and only those.
+    """Prove replace_action_pin rewrites an ACTION pin's tag, and only that.
 
-    Separate from self_test() because ACTION pins span several files and carry two
-    capture groups, so neither the single-file backup nor the single-group
-    assertion below applies to them.
+    Separate from self_test() because ACTION pins span several files, so the
+    single-file backup below does not apply to them. The lockfile is not
+    touched: relock() is gh-actions-lock's code, not ours, and needs the network.
     """
     failures = 0
-    sentinel_sha, sentinel_tag = "0" * 40, "v9.9.9"
+    sentinel_tag = "v9.9.9"
     for pin in ACTION_PINS:
         backups = {rel: read(rel) for rel in pin["files"]}
         try:
-            cur_sha, cur_tag = current_action_pin(pin)
-            n = replace_action_pin(pin, sentinel_sha, sentinel_tag)
+            cur_tag = current_action_pin(pin)
+            n = replace_action_pin(pin, sentinel_tag)
             bad = False
             for rel, before in backups.items():
                 after = read(rel)
@@ -950,18 +1083,15 @@ def self_test_actions() -> int:
                 for a, b in zip(before.splitlines(), after.splitlines()):
                     if a == b:
                         continue
-                    want = a.replace(cur_sha, sentinel_sha).replace(cur_tag, sentinel_tag)
+                    want = a.replace(f"{pin['repo']}@{cur_tag}", f"{pin['repo']}@{sentinel_tag}")
                     if want != b:
                         print(f"  FAIL {pin['name']}: {rel} changed more than the pin:\n    {b}")
                         bad = True
-            # Both halves must actually have moved. A rewrite that updated the
-            # commit and left the comment behind is the exact failure this class
-            # exists to prevent, so assert it rather than trusting the diff.
             # Re-read through current_action_pin rather than grepping the files:
             # the old version string also appears in prose comments that are
             # correctly left alone, and it doubles as proof that the rewritten
             # text still matches the pattern.
-            if current_action_pin(pin) != (sentinel_sha, sentinel_tag):
+            if current_action_pin(pin) != sentinel_tag:
                 print(f"  FAIL {pin['name']}: pin does not read back as rewritten")
                 bad = True
             if not bad:

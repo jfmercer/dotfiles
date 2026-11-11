@@ -84,13 +84,13 @@ bump-deps --self-test  # prove the in-place editing is surgical
 
 | Class | Where | Bumping means |
 |-------|-------|---------------|
-| `VERSION` | `install.sh`, `ci.yaml`, linux installs | Latest stable release. Automatic. A pin may carry `hashes` — checksums whose URL embeds the version, so they are *derived*, not independent. Those are recomputed and rewritten in the same operation as the version, for the reason `ACTION` moves its comment with its SHA. `delta`, `navi` and `tree-sitter` carry them today, because none of them publishes a checksum file for its release binaries. A pin may also carry `latest_url` for an upstream that publishes no GitHub Releases. |
-| `ACTION` | `ci.yaml`, `deps.yaml` | A GitHub Action pinned to a commit SHA with a `# vX.Y.Z` comment. Resolves the latest release's tag to its commit and rewrites **both halves together**. Automatic. |
+| `VERSION` | `install.sh`, `ci.yaml`, `deps.yaml`, linux installs | Latest stable release. Automatic. A pin may carry `hashes` — checksums whose URL embeds the version, so they are *derived*, not independent. Those are recomputed and rewritten in the same operation as the version, for the reason `ACTION` relocks in the same run as it retags. `delta`, `navi` and `tree-sitter` carry them today, because none of them publishes a checksum file for its release binaries. A pin may also carry `latest_url` for an upstream that publishes no GitHub Releases. |
+| `ACTION` | `ci.yaml`, `deps.yaml`, `actions.lock` | A GitHub Action referenced by an exact `vX.Y.Z` tag and locked to a commit by `.github/workflows/actions.lock`. Rewrites the tag in every workflow, then regenerates the lockfile with `gh actions-lock --no-onboard` in the same run. Automatic, but needs the `gh-actions-lock` extension; without it `--apply` aborts rather than leave tags the lockfile does not cover. |
 | `EXTERNAL` | `.chezmoiexternal.yaml` (14) | Move to master HEAD, recompute checksum. Confirmed per entry, because it pulls upstream code nobody has read — `-y` (aka `--yes`, `--externals-all`) waives that prompt for the whole run. |
 | `CONTENT` | *(registry empty)* | A hash over an *unversioned* URL. A change means upstream rewrote the file — a trust decision, so it is reported and needs `--accept <name>`. `rustup` was the only member; it moved to `VERSION` and has since been dropped entirely (see below). The class is kept because the shape recurs and is currently *unpinned* in two places: `install.sh` curls `get.chezmoi.io`, and the Homebrew bootstrap curls a `HEAD` URL. |
 | `ANCHOR` | `EZA_KEY_FPR`, `CHARM_KEY_FPR` | A GPG public-key fingerprint. **Never rewritten automatically.** A mismatch is key rotation or an attack; verify against upstream's own announcement and edit by hand. `CHARM_KEY_FPR` (Charm's apt repo, for glow) carries an expiry of 2027-07-13, so it *will* rotate on schedule — unlike eza's. |
 
-It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and Actions **not** pinned to a commit SHA with a matching version comment.
+It also asserts cross-file invariants, notably that **`.chezmoiversion` must not exceed `install.sh`'s `CHEZMOI_VERSION`** — the floor is the minimum chezmoi allowed to read this source, so if it outruns the version the bootstrap installs, a fresh machine installs chezmoi and is then refused by it. It further rejects externals tracking a moving ref, and — walking every `uses:` in every workflow, not just the registered ones — any action that is not a registered `ACTION` pin, not on an exact `vX.Y.Z` tag, or not listed for that workflow in `actions.lock`. That last check is the offline half of `gh actions-lock --verify` (coverage, not trust), so `--check` catches a forgotten relock without the extension installed. It also requires the two `gh-actions-lock` VERSION pins (`ci.yaml` verifies, `deps.yaml` writes) to agree.
 
 It likewise requires that **every `*_SHA256*` in the linux installs script is registered as a `hashes` entry, and vice versa** — the same check as the fingerprint one below, in both directions, because these are derived values that never fail noisily on their own. An unregistered checksum is simply never recomputed, so the next bump moves `DELTA_VERSION` and leaves it describing the *previous* release: a tree that reports `current` and cannot install. A registered one with no counterpart in the script makes `--apply` abort after the version line has already been rewritten, leaving the tree half-bumped.
 
@@ -125,13 +125,13 @@ It opens a PR; it never merges one, and it never pushes to master. One long-live
 
 `tests/python/test_bump_deps.py` reads the real workflow and asserts every status `gather()` can emit is matched by exactly one of those two greps. A status in neither would be reported by `--check` — exit 1, job green — and then acted on by nobody, while the close-the-issue step tidied away the previous week's notice on its way past.
 
-**`DEPS_PR_TOKEN` is a fine-grained PAT, and not for want of permissions.** GitHub refuses to fire `pull_request` workflows for anything the `GITHUB_TOKEN` creates, so a PR opened with it arrives with **no checks at all** — and on a bump that is the entire review: CI is what verifies a new external checksum against what upstream now serves (the `apply` job) and what rejects an action SHA zizmor dislikes (the `workflows` job). The token needs three permissions on this repository and no more:
+**`DEPS_PR_TOKEN` is a fine-grained PAT, and not for want of permissions.** GitHub refuses to fire `pull_request` workflows for anything the `GITHUB_TOKEN` creates, so a PR opened with it arrives with **no checks at all** — and on a bump that is the entire review: CI is what verifies a new external checksum against what upstream now serves (the `apply` job) and what verifies the regenerated `actions.lock` (the `workflows` job). The token needs three permissions on this repository and no more:
 
 | Permission | For |
 |---|---|
 | Contents: write | pushing the branch |
 | Pull requests: write | opening, editing and labelling the PR |
-| **Workflows: write** | `bump-deps` rewrites the `ACTION` pins *inside* `.github/workflows/`, and GitHub rejects a push touching a workflow file from a token without this — with an error about scopes that names neither the workflow nor the offending file |
+| **Workflows: write** | `bump-deps` rewrites the `ACTION` tags and `actions.lock`, all *inside* `.github/workflows/`, and GitHub rejects a push touching a workflow file from a token without this — with an error about scopes that names neither the workflow nor the offending file |
 
 The `GITHUB_TOKEN` keeps `contents: read` + `issues: write` and nothing more; it never gains write on the repository's code. Fine-grained PATs expire, so a red job here is as likely to be an expired token as a real failure — check that first. If the secret is missing entirely the job fails loudly with an `::error::` saying exactly what to create, rather than degrading to something quieter.
 
@@ -139,22 +139,21 @@ The push authenticates through a `credential.helper` that echoes `$DEPS_PR_TOKEN
 
 chezmoi is deliberately **not** installed in this job. `bump-deps`' own external verification shells out to `chezmoi apply --dry-run --refresh-externals`, which resolves its source directory from `~/.local/share/chezmoi` rather than the checkout — so it would verify the wrong tree. Absent, it prints "skipping" and returns success; the real check is CI's `apply` job on the PR.
 
-#### Why Actions are hash-pinned, and why the comment is load-bearing
+#### Actions are locked by `actions.lock`, not by inline SHAs
 
-The invariant above used to demand the opposite — an exact `vX.Y.Z` tag, rejecting a commit SHA as a "floating tag". That was backwards, for the reason this file already gives for the externals: a tag can be force-moved by anyone able to push to the action's repo, a commit cannot. These run with a `GITHUB_TOKEN`, so it matters more here, not less.
+`uses:` lines carry a readable exact tag (`actions/checkout@v7.0.1`); **what runs is the commit in `.github/workflows/actions.lock`**, a [GitHub Actions workflow lockfile](https://docs.github.com/actions/concepts/security/workflow-dependency-lockfiles) generated by the `gh actions-lock` CLI extension (`gh extension install github/gh-actions-lock`). It records, per dependency, the commit plus the numeric `owner_id`/`repo_id`, and the runner refuses a run whose tag has moved, whose commit is no longer reachable from that tag, or whose repository is not the one locked. That is the guarantee the previous inline `@<sha> # vX.Y.Z` pins gave — a force-pushed tag cannot change what runs — and it covers transitive dependencies of composite actions, which inline pins never did.
 
-The bigger point is that **hash-pinning is what makes the pin auditable at all.** Four zizmor audits inspect the SHA, and none of them can run on a tag pin:
+**Never edit `actions.lock` by hand, and never commit a `uses:` change without it.** After adding, removing or retagging any `uses:` (or adding a workflow that has one), run `gh actions-lock` from the repo root and commit both together. Three things catch a forgotten relock: `bump-deps --check` (offline coverage), the `workflows` job's `gh actions-lock --verify` step (full check, online), and zizmor, which reports every tag-pinned `uses:` as `unpinned-uses` when no lockfile covers it.
 
-| Audit | Verifies |
-|---|---|
-| `impostor-commit` | The commit came from that repo, not a **fork in its network**. GitHub serves any commit in a fork network from any repo URL in it, so `actions/checkout@<attacker-fork-sha>` resolves and looks legitimate. |
-| `ref-version-mismatch` | The `# vX.Y.Z` comment actually corresponds to that commit. |
-| `stale-action-refs` | The commit sits on a release tag, not an arbitrary mid-development one. |
-| `known-vulnerable-actions` | No CVE against the pinned version. |
+Things that look like simplifications and are not:
 
-So the trailing comment is not decoration — it is checked, which is why `bump-deps` rewrites the SHA and the comment as one operation rather than leaving the comment to rot into a lie.
+- **Do not go back to inline SHAs "for zizmor".** `gh actions-lock` rewrites them to tags anyway, and zizmor ≥ v1.32.0 reads the lockfile. The trade is real, though: zizmor's `impostor-commit`, `ref-version-mismatch` and `stale-action-refs` audits inspect the `uses:` line and have nothing to check on a tag; the lockfile's repo-ID and reachability checks now do that job. zizmor's lockfile support is documented as **experimental**.
+- **`--no-onboard` in `relock()` is deliberate.** Automation may only re-pin workflows already in the lockfile. Onboarding a new workflow is a human running `gh actions-lock`. Never add `--accept-moved` to anything unattended — GitHub's docs say so explicitly; it would silently accept a rewritten tag.
+- **Reusable workflows (`jobs.<id>.uses`) are not covered by the lockfile.** None exist here today; if one is ever added it needs a full commit SHA, and `bump-deps`' invariant will reject it as not being an exact tag — handle that case deliberately rather than loosening the check.
+- **The "Require lockfile" policy** (Settings → Actions → Policies) is what makes GitHub *block* a workflow that is not onboarded, rather than run it on bare tags. It is a repository setting, not something in this tree, so it must be enabled by hand; without it, a PR that deleted `actions.lock` would still fail CI (the three checks above), but the workflows in that PR would run unlocked while doing so.
+- **`tests/fixtures/zizmor/canary.yml` stays hash-pinned.** It is not a real workflow; its wrong version comment is what proves zizmor's online audits ran, which still matters for `known-vulnerable-actions`. It lives outside `.github/workflows/` and so is outside the lockfile's scope.
 
-`actions/checkout` is pinned in **both** workflows, which is why an `ACTION` pin holds a list of files. Before this class existed only `ci.yaml` was registered, so `--apply` would rewrite five pins there, silently leave `deps.yaml` behind, and then report "all pins current" — the staleness detector certifying a file it had never read.
+`actions/checkout` is used in **both** workflows, which is why an `ACTION` pin holds a list of files. Before this class did, only `ci.yaml` was registered, so `--apply` would rewrite five pins there, silently leave `deps.yaml` behind, and then report "all pins current" — the staleness detector certifying a file it had never read.
 
 ### Zsh loading order (`dot_zshrc`)
 1. `*/exports.zsh` files — environment variables
@@ -402,8 +401,8 @@ parts worth knowing before you touch anything:
   Registering a new pin in `bump-deps` means adding it to `tests/python/helper.py`
   too — that coupling is intentional.
 - **A test that cannot fail is worse than none.** `tests/README.md` ends with a
-  table of one-line breakages that must each turn the suite red; all nine were
-  verified when the suite landed.
+  table of one-line breakages that must each turn the suite red; each was
+  verified by making the breakage and watching the suite fail.
 
 ## CI
 
@@ -414,7 +413,7 @@ Every job runs with `permissions: contents: read`, set once at the workflow leve
 | Job | Runs on | What it gates |
 |-----|---------|---------------|
 | `lint` | macos + ubuntu | Five checks. **`zsh -n`** over `dot_zshrc`, `dot_zshenv`, every `*/*.zsh` and any zsh-shebang `bin/` script — see below. **`shellcheck`** (pinned v0.11.0, installed from upstream releases so both runners agree) over `install.sh`, `scripts/*.sh`, `bin/*`, `.chezmoiscripts/*.sh`, selected by shebang so `.ps1` and zsh files are skipped; plus every `.chezmoiscripts/**/*.tmpl` rendered through `chezmoi execute-template` first. **`py_compile`** over Python scripts, which shellcheck's shebang selection skips entirely. **`ruff`** (`E9,F,S`, ignoring `S603`/`S607`) over `bin/bump-deps` and `tests/python/` — `py_compile` only proves a file parses, so it cannot see a dead import. **`bump-deps --self-test`**. Strict — the tree was clean when each landed, so a new finding is a regression. |
-| `workflows` | ubuntu | Audits the CI configuration itself, which nothing used to check. **`actionlint`** for correctness — and it runs shellcheck over `run:` blocks, ~200 lines of shell no other job sees. **`zizmor`** for security. Single-platform on purpose: `lint`/`test` are matrixed because the `.chezmoiscripts/{darwin,linux}` templates render per-OS, whereas workflow analysis is platform-independent. Ends with a **canary** — see below. |
+| `workflows` | ubuntu | Audits the CI configuration itself, which nothing used to check. **`actionlint`** for correctness — and it runs shellcheck over `run:` blocks, ~200 lines of shell no other job sees. **`zizmor`** for security. **`gh actions-lock --verify`** (extension pinned, tracked by `bump-deps`) for the lockfile. Single-platform on purpose: `lint`/`test` are matrixed because the `.chezmoiscripts/{darwin,linux}` templates render per-OS, whereas workflow analysis is platform-independent. Ends with a **canary** — see below. |
 
 **Why `zsh -n` is a separate gate.** shellcheck cannot parse zsh, so nothing else in CI looks at the ~25 files sourced into every interactive shell. That mattered more than it sounds: a parse error in a topic file does **not** hard-fail the shell — zsh reports it and carries on, silently dropping every alias and setting after the error. So a break would ship green and later present as "some of my aliases disappeared". The file list is derived from globs, not hardcoded, so a new topic file is covered automatically. `-n` parses without executing, which is the only safe option given these files alter `PATH`, install hooks and start the prompt.
 | `test` | macos + ubuntu | `./tests/run` — bats over the shell, stdlib `unittest` over `bin/bump-deps`. bats-core is pinned to an exact release tarball **with its sha256 verified**, for the same reason shellcheck is pinned: Ubuntu's apt `bats` trails Homebrew's by several minors and they disagree about which helpers exist. Also asserts nothing **skipped** — a missing `jq`/`zsh`/`chezmoi` makes tests skip rather than fail (deliberate, so the suite runs on a half-configured laptop), but on a runner a skip means the job silently tested less than it claims. |
