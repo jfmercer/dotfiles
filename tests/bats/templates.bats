@@ -244,6 +244,19 @@ template_list() {
     assert_equal "$from_tmpl" "$from_zsh"
 }
 
+@test "the apply script defaults XDG_CONFIG_HOME exactly as dot_zshenv does" {
+    # brew trust records into $XDG_CONFIG_HOME/homebrew/trust.json. If the two
+    # defaults drift, a bootstrap apply trusts tap formulae in a file interactive
+    # brew never reads, and `brew upgrade` later refuses them as untrusted.
+    local from_tmpl from_zshenv
+    from_tmpl="$(grep -h '^export XDG_CONFIG_HOME=' "$REPO_ROOT/$HOMEBREW_TMPL" | head -1)"
+    from_zshenv="$(grep -h '^export XDG_CONFIG_HOME=' "$REPO_ROOT/dot_zshenv" | head -1)"
+
+    [ -n "$from_tmpl" ] || { echo "no exported XDG_CONFIG_HOME in $HOMEBREW_TMPL" >&2; return 1; }
+    [ -n "$from_zshenv" ] || { echo "no XDG_CONFIG_HOME in dot_zshenv" >&2; return 1; }
+    assert_equal "$from_tmpl" "$from_zshenv"
+}
+
 @test "the apply-time cask options still require a checksum" {
     run grep -q -- '--require-sha' "$REPO_ROOT/homebrew/exports.zsh"
     assert_success

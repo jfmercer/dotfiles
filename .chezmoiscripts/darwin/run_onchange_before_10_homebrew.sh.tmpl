@@ -78,6 +78,23 @@ brew update --quiet
 {{ $casks_no_sha := list
      "font-gentium-plus" }}
 
+# Homebrew refuses to load a formula from a non-official tap until it is
+# trusted ("Refusing to load formula ... from untrusted tap"), and brew bundle
+# does not do it for you. Trust each tap formula individually rather than the
+# whole tap, so a tap gaining a new formula does not silently widen what runs.
+# Being listed in $brews by its fully qualified name is the opt-in.
+#
+# Trust lives in $XDG_CONFIG_HOME/homebrew/trust.json, falling back to
+# ~/.homebrew/trust.json when the variable is unset -- as it is under the
+# curl | bash bootstrap. Default it exactly as dot_zshenv does, or interactive
+# brew would not see the trust recorded here and `brew upgrade` would refuse.
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+{{- range ($brews | sortAlpha | uniq) }}
+{{- if contains "/" . }}
+brew trust --quiet --formula "{{ . }}"
+{{- end }}
+{{- end }}
+
 brew bundle --file=/dev/stdin <<EOF
 {{ range ($brews | sortAlpha | uniq) }}
 brew "{{ . }}"
