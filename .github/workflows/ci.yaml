@@ -174,7 +174,7 @@ jobs:
       # `v` prefix upstream.
       - name: Install ruff
         env:
-          RUFF_VERSION: 0.17.5
+          RUFF_VERSION: 0.17.6
         run: |
           case "$RUNNER_OS-$(uname -m)" in
             macOS-arm64)   target=aarch64-apple-darwin ;;
@@ -281,7 +281,7 @@ jobs:
 
       - name: Install zizmor
         env:
-          ZIZMOR_VERSION: v1.32.0
+          ZIZMOR_VERSION: v1.33.1
         run: |
           url="https://github.com/zizmorcore/zizmor/releases/download/${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           curl -fsSL --retry 5 --retry-all-errors --connect-timeout 15 -o /tmp/zizmor.tar.gz "$url"
@@ -315,7 +315,7 @@ jobs:
       - name: Verify the Actions lockfile
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_ACTIONS_LOCK_VERSION: v0.4.1
+          GH_ACTIONS_LOCK_VERSION: v0.5.1
         run: |
           scripts/retry.sh 5 gh extension install github/gh-actions-lock --pin "$GH_ACTIONS_LOCK_VERSION"
           gh actions-lock --version
