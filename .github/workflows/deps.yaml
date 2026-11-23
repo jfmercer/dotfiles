@@ -192,7 +192,7 @@ jobs:
         if: steps.check.outputs.bumpable == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_ACTIONS_LOCK_VERSION: v0.4.1
+          GH_ACTIONS_LOCK_VERSION: v0.5.1
         run: |
           scripts/retry.sh 5 gh extension install github/gh-actions-lock --pin "$GH_ACTIONS_LOCK_VERSION"
           gh actions-lock --version
